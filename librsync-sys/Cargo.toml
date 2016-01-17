@@ -1,10 +1,9 @@
 [package]
-name = "librsync"
+name = "librsync-sys"
 version = "0.1.0"
 authors = ["Michele Bertasi <@brt_device>"]
+build = "build.rs"
 license = "MIT/Apache-2.0"
-readme = "README.md"
-keywords = ["librsync", "rsync", "backup"]
 repository = "https://github.com/mbrt/librsync-rs"
 homepage = "https://github.com/mbrt/librsync-rs"
 description = """
@@ -12,6 +11,12 @@ Bindings to librsync for calculating and applying network
 deltas exposed as Reader/Writer streams.
 """
 
+[lib]
+name = "librsync_sys"
+path = "lib.rs"
+
 [dependencies]
 libc = "0.2"
-librsync-sys = { version = "0.1", path = "librsync-sys" }
+
+[build-dependencies]
+gcc = "0.3"
