@@ -1,8 +1,9 @@
-#[allow(bad_style)]
+#![allow(bad_style)]
 
 extern crate libc;
 use libc::*;
 
+pub type rs_magic_number = c_int;
 pub const RS_DELTA_MAGIC: c_int = 0x72730236;
 pub const RS_MD4_SIG_MAGIC: c_int = 0x72730136;
 pub const RS_BLAKE2_SIG_MAGIC: c_int = 0x72730137;
@@ -45,6 +46,6 @@ pub struct rs_job_t {
 extern {
     pub fn rs_sig_begin(new_block_len: size_t,
                         strong_sum_len: size_t,
-                        sig_magic: c_int/*rs_magic_number*/)
+                        sig_magic: rs_magic_number)
                         -> *mut rs_job_t;
 }
