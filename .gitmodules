@@ -1,0 +1,3 @@
+[submodule "librsync-sys/librsync"]
+	path = librsync-sys/librsync
+	url = https://github.com/librsync/librsync.git
