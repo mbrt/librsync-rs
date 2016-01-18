@@ -3,9 +3,12 @@ extern crate gcc;
 use std::env;
 
 fn main() {
+    let target = env::var("TARGET").unwrap();
+    let windows = target.contains("windows");
+
     let mut cfg = gcc::Config::new();
 
-    if env::var("TARGET").unwrap().contains("windows") {
+    if windows {
         cfg.define("_WIN32", None);
     }
 
@@ -13,9 +16,6 @@ fn main() {
        .include("prototab")
        .include("librsync/src")
        .define("STDC_HEADERS", Some("1"))
-       .define("DO_RS_TRACE", Some("0"))
-       .define("HAVE_PROGRAM_INVOCATION_NAME", Some("0"))
-       .define("HAVE_VARARG_MACROS", Some("0"))
        .file("prototab/prototab.c")
        .file("librsync/src/base64.c")
        .file("librsync/src/buf.c")
