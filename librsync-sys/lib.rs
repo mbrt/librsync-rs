@@ -25,7 +25,10 @@ pub const RS_PARAM_ERROR: c_int = 108;
 
 pub const RS_DEFAULT_BLOCK_LEN: size_t = 2048;
 
+pub type rs_long_t = c_longlong;
+
 pub enum rs_job_t {}
+pub enum rs_signature_t {}
 
 #[repr(C)]
 pub struct rs_buffers_t {
@@ -36,15 +39,18 @@ pub struct rs_buffers_t {
     pub avail_out: size_t,
 }
 
-pub type rs_driven_cb = extern "C" fn(*mut rs_job_t, *mut rs_buffers_t, *mut c_void) -> rs_result;
+pub type rs_driven_cb = extern "C" fn(job: *mut rs_job_t,
+                                      buf: *mut rs_buffers_t,
+                                      opaque: *mut c_void)
+                                      -> rs_result;
+pub type rs_copy_cb = extern "C" fn(opaque: *mut c_void,
+                                    pos: rs_long_t,
+                                    len: *mut size_t,
+                                    buf: *mut *mut c_void)
+                                    -> rs_result;
 
 
 extern "C" {
-    pub fn rs_sig_begin(new_block_len: size_t,
-                        strong_sum_len: size_t,
-                        sig_magic: rs_magic_number)
-                        -> *mut rs_job_t;
-
     pub fn rs_job_iter(job: *mut rs_job_t, buffers: *mut rs_buffers_t) -> rs_result;
     pub fn fs_job_drive(job: *mut rs_job_t,
                         buf: *mut rs_buffers_t,
@@ -53,4 +59,14 @@ extern "C" {
                         out_cb: rs_driven_cb,
                         out_opaque: *mut c_void)
                         -> rs_result;
+    pub fn rs_job_free(job: *mut rs_job_t) -> rs_result;
+
+    pub fn rs_sig_begin(new_block_len: size_t,
+                        strong_sum_len: size_t,
+                        sig_magic: rs_magic_number)
+                        -> *mut rs_job_t;
+    pub fn rs_delta_begin(sig: *mut rs_signature_t) -> *mut rs_job_t;
+    pub fn rs_loadsig_begin(sig: *mut *mut rs_signature_t) -> *mut rs_job_t;
+    pub fn rs_build_hash_table(sums: *mut rs_signature_t) -> rs_result;
+    pub fn rs_patch_begin(copy_cb: rs_copy_cb, copy_arg: *mut c_void) -> *mut rs_job_t;
 }
