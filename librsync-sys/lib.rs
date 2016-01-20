@@ -32,7 +32,7 @@ pub enum rs_signature_t {}
 
 #[repr(C)]
 pub struct rs_buffers_t {
-    pub next_in: *mut c_char,
+    pub next_in: *const c_char,
     pub avail_in: size_t,
     pub eof_in: c_int,
     pub next_out: *mut c_char,
