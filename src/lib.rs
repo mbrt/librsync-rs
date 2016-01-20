@@ -26,22 +26,47 @@ pub enum Error {
     ParamError,
 }
 
-pub struct SigStream;
+pub type Result<T> = std::result::Result<T, Error>;
 
-pub fn compute_signature<R: Read>(old: R,
-                                  new_block_len: usize,
-                                  strong_len: usize,
-                                  sig_magic: MagicNumber)
-                                  -> Result<SigStream, Error> {
-    unsafe {
-        let job = raw::rs_sig_begin(new_block_len, strong_len, sig_magic.raw());
-        if job.is_null() {
-            return Err(Error::BadMagic);
-        }
-        raw::rs_job_free(job);
-    }
-    Ok(SigStream)
+pub struct Signature<R: Read> {
+    old: R,
+    job: *mut raw::rs_job_t,
 }
+
+impl<R: Read> Signature<R> {
+    pub fn new(old: R,
+               new_block_len: usize,
+               strong_len: usize,
+               sig_magic: MagicNumber)
+               -> Result<Self> {
+        unsafe {
+            let job = raw::rs_sig_begin(new_block_len, strong_len, sig_magic.as_raw());
+            if job.is_null() {
+                return Err(Error::BadMagic);
+            }
+            Ok(Signature {
+                old: old,
+                job: job,
+            })
+        }
+    }
+}
+
+impl<R: Read> Drop for Signature<R> {
+    fn drop(&mut self) {
+        unsafe {
+            assert!(!self.job.is_null());
+            raw::rs_job_free(self.job);
+        }
+    }
+}
+
+impl<R: Read> Read for Signature<R> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        Ok(0)
+    }
+}
+
 
 impl MagicNumber {
     pub fn from_raw(raw: raw::rs_magic_number) -> Option<Self> {
@@ -53,11 +78,11 @@ impl MagicNumber {
         }
     }
 
-    fn raw(&self) -> raw::rs_magic_number {
+    fn as_raw(&self) -> raw::rs_magic_number {
         match *self {
             MagicNumber::Delta => raw::RS_DELTA_MAGIC,
-            MagicNumber::MD4 =>  raw::RS_MD4_SIG_MAGIC,
-            MagicNumber::Blake2 =>  raw::RS_BLAKE2_SIG_MAGIC,
+            MagicNumber::MD4 => raw::RS_MD4_SIG_MAGIC,
+            MagicNumber::Blake2 => raw::RS_BLAKE2_SIG_MAGIC,
         }
     }
 }
@@ -72,13 +97,14 @@ mod test {
     fn signature() {
         let data = "this is a string to be tested";
         let cursor = Cursor::new(data);
-        compute_signature(cursor, 10, 5, MagicNumber::MD4).unwrap();
+        let _sig = Signature::new(cursor, 10, 5, MagicNumber::MD4).unwrap();
     }
 
     #[test]
     fn signature_invalid_magic() {
         let data = "this is a string to be tested";
         let cursor = Cursor::new(data);
-        assert!(compute_signature(cursor, 10, 5, MagicNumber::Delta).is_err());
+        let sig = Signature::new(cursor, 10, 5, MagicNumber::Delta);
+        assert!(sig.is_err());
     }
 }
