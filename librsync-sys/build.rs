@@ -1,6 +1,7 @@
 extern crate gcc;
 
 use std::env;
+use std::path::Path;
 
 fn main() {
     let target = env::var("TARGET").unwrap();
@@ -12,7 +13,13 @@ fn main() {
         cfg.define("_WIN32", None);
     }
 
-    cfg.include("config")
+    let cfg_dir = {
+        let mut p = Path::new("config").to_path_buf();
+        p.push(target);
+        p
+    };
+
+    cfg.include(cfg_dir)
        .include("prototab")
        .include("librsync/src")
        .define("STDC_HEADERS", Some("1"))
