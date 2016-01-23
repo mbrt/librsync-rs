@@ -37,6 +37,7 @@ pub struct Signature<R: Read> {
     buf: Vec<u8>,
     pos: usize,
     cap: usize,
+    done: bool,
 }
 
 struct Job(*mut raw::rs_job_t);
@@ -64,6 +65,7 @@ impl<R: Read> Signature<R> {
             buf: vec![0; raw::RS_DEFAULT_BLOCK_LEN],
             pos: 0,
             cap: 0,
+            done: false,
         })
     }
 
@@ -74,7 +76,16 @@ impl<R: Read> Signature<R> {
 
 impl<R: Read> Read for Signature<R> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let mut buffers = Buffers::new(&self.buf, buf);
+        if self.cap == 0 {
+            // need to read some data from input
+            let read = try!(self.old.read(&mut self.buf));
+            if read == 0 {
+                self.done = true;
+            }
+            self.pos = 0;
+        }
+
+        let mut buffers = Buffers::new(&self.buf[self.pos..self.pos + self.cap], buf);
         let res = unsafe { raw::rs_job_iter(*self.job, buffers.as_raw()) };
         match res {
             raw::RS_DONE | raw::RS_BLOCKED => Ok(0),
