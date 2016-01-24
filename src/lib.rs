@@ -109,8 +109,8 @@ impl<R: Read> Read for Signature<R> {
             let written = out_cap - buffers.available_output();
             out_pos += written;
             out_cap -= written;
-            if out_cap == 0 || self.done {
-                return Ok(written);
+            if out_cap == 0 || written == 0 {
+                return Ok(out_pos);
             }
         }
     }
@@ -213,13 +213,21 @@ fn other_io_err<T: AsRef<str>>(msg: T) -> io::Error {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::io::Cursor;
+    use std::io::{Cursor, Read};
 
     #[test]
     fn signature() {
         let data = "this is a string to be tested";
         let cursor = Cursor::new(data);
-        let _sig = Signature::new(cursor, 10, 5, MagicNumber::MD4).unwrap();
+        let mut sig = Signature::new(cursor, 10, 5, MagicNumber::MD4).unwrap();
+        let mut signature = Vec::new();
+        let read = sig.read_to_end(&mut signature).unwrap();
+        assert_eq!(read, signature.len());
+        let expected = vec![0x72, 0x73, 0x01, 0x36, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,
+                            0x05, 0x1b, 0x21, 0x04, 0x8b, 0xad, 0x3c, 0xbd, 0x19, 0x09, 0x1d,
+                            0x1b, 0x04, 0xf0, 0x9d, 0x1f, 0x64, 0x31, 0xde, 0x15, 0xf4, 0x04,
+                            0x87, 0x60, 0x96, 0x19, 0x50, 0x39];
+        assert_eq!(signature, expected);
     }
 
     #[test]
