@@ -37,6 +37,7 @@ pub struct Signature<R: Read> {
     buf: Vec<u8>,
     pos: usize,
     cap: usize,
+    // true when input has ended
     done: bool,
 }
 
@@ -76,20 +77,41 @@ impl<R: Read> Signature<R> {
 
 impl<R: Read> Read for Signature<R> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if self.cap == 0 {
-            // need to read some data from input
-            let read = try!(self.old.read(&mut self.buf));
-            if read == 0 {
-                self.done = true;
-            }
-            self.pos = 0;
-        }
+        let mut out_pos = 0;
+        let mut out_cap = buf.len();
 
-        let mut buffers = Buffers::new(&self.buf[self.pos..self.pos + self.cap], buf);
-        let res = unsafe { raw::rs_job_iter(*self.job, buffers.as_raw()) };
-        match res {
-            raw::RS_DONE | raw::RS_BLOCKED => Ok(0),
-            _ => Err(other_io_err("Error processing signature")),
+        loop {
+            if self.cap == 0 && !self.done {
+                // need to read some data from input
+                let read = try!(self.old.read(&mut self.buf));
+                if read == 0 {
+                    self.done = true;
+                }
+                self.pos = 0;
+                self.cap = read;
+            }
+
+            // work
+            let mut buffers = Buffers::new(&self.buf[self.pos..self.pos + self.cap],
+                                           &mut buf[out_pos..],
+                                           self.done);
+            let res = unsafe { raw::rs_job_iter(*self.job, buffers.as_raw()) };
+            if res != raw::RS_DONE && res != raw::RS_BLOCKED {
+                let err = Error::from_raw(res);
+                return Err(other_io_err(format!("Error processing signature: \'{:?}\'", err)));
+            }
+
+            // update buffer cap and pos
+            let read = self.cap - buffers.available_input();
+            self.pos += read;
+            self.cap -= read;
+            // determine written
+            let written = out_cap - buffers.available_output();
+            out_pos += written;
+            out_cap -= written;
+            if out_cap == 0 || self.done {
+                return Ok(written);
+            }
         }
     }
 }
@@ -156,12 +178,12 @@ impl Drop for Job {
 
 
 impl<'a> Buffers<'a> {
-    pub fn new(in_buf: &'a [u8], out_buf: &'a mut [u8]) -> Self {
+    pub fn new(in_buf: &'a [u8], out_buf: &'a mut [u8], eof_in: bool) -> Self {
         Buffers {
             inner: raw::rs_buffers_t {
                 next_in: in_buf.as_ptr() as *const i8,
                 avail_in: in_buf.len(),
-                eof_in: 0,
+                eof_in: if eof_in { 1 } else { 0 },
                 next_out: out_buf.as_mut_ptr() as *mut i8,
                 avail_out: out_buf.len(),
             },
@@ -172,11 +194,19 @@ impl<'a> Buffers<'a> {
     pub fn as_raw(&mut self) -> *mut raw::rs_buffers_t {
         &mut self.inner
     }
+
+    pub fn available_input(&self) -> usize {
+        self.inner.avail_in as usize
+    }
+
+    pub fn available_output(&self) -> usize {
+        self.inner.avail_out as usize
+    }
 }
 
 
-fn other_io_err(msg: &str) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, msg)
+fn other_io_err<T: AsRef<str>>(msg: T) -> io::Error {
+    io::Error::new(io::ErrorKind::Other, msg.as_ref())
 }
 
 
