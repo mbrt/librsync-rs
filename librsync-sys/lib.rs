@@ -68,5 +68,6 @@ extern "C" {
     pub fn rs_delta_begin(sig: *mut rs_signature_t) -> *mut rs_job_t;
     pub fn rs_loadsig_begin(sig: *mut *mut rs_signature_t) -> *mut rs_job_t;
     pub fn rs_build_hash_table(sums: *mut rs_signature_t) -> rs_result;
+    pub fn rs_free_sumset(sums: *mut rs_signature_t);
     pub fn rs_patch_begin(copy_cb: rs_copy_cb, copy_arg: *mut c_void) -> *mut rs_job_t;
 }
