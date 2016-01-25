@@ -3,7 +3,11 @@ extern crate librsync_sys as raw;
 mod job;
 
 use job::{Job, JobDriver};
+
+use std::error;
+use std::fmt::{self, Display, Formatter};
 use std::io::{self, Read};
+use std::ptr;
 
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -27,6 +31,7 @@ pub enum Error {
     Corrupt,
     Internal,
     Param,
+    Unknown(i32),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -69,23 +74,60 @@ impl<R: Read> Read for Signature<R> {
 }
 
 
-impl Error {
-    fn from_raw(val: raw::rs_result) -> Option<Self> {
-        match val {
-            raw::RS_DONE => Some(Error::Done),
-            raw::RS_BLOCKED => Some(Error::Blocked),
-            raw::RS_RUNNING => Some(Error::Running),
-            raw::RS_TEST_SKIPPED => Some(Error::TestSkipped),
-            raw::RS_IO_ERROR => Some(Error::Io(other_io_err("Unknown IO error"))),
-            raw::RS_SYNTAX_ERROR => Some(Error::Syntax),
-            raw::RS_MEM_ERROR => Some(Error::Mem),
-            raw::RS_INPUT_ENDED => Some(Error::InputEnded),
-            raw::RS_BAD_MAGIC => Some(Error::BadMagic),
-            raw::RS_UNIMPLEMENTED => Some(Error::Unimplemented),
-            raw::RS_CORRUPT => Some(Error::Corrupt),
-            raw::RS_INTERNAL_ERROR => Some(Error::Internal),
-            raw::RS_PARAM_ERROR => Some(Error::Param),
-            _ => None,
+impl<R: Read> Delta<R> {
+    pub fn new<R2: Read>(input: R, signature: R2) -> Result<Self> {
+        let sumset = unsafe {
+            let mut sumset = ptr::null_mut();
+            let job = raw::rs_loadsig_begin(&mut sumset);
+            assert!(!job.is_null());
+            let mut job = JobDriver::new(signature, Job(job));
+            try!(job.consume_input());
+            Sumset(sumset)
+        };
+        unimplemented!()
+    }
+}
+
+
+impl error::Error for Error {
+    fn description(&self) -> &str {
+        ""
+    }
+}
+
+impl Display for Error {
+    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
+        match *self {
+            Error::Io(ref e) => write!(fmt, "{}", e),
+            Error::Unknown(n) => write!(fmt, "Unknown error {} from librsync", n),
+            _ => write!(fmt, "Error {:?} from librsync", self),
+        }
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(err: io::Error) -> Error {
+        Error::Io(err)
+    }
+}
+
+impl From<raw::rs_result> for Error {
+    fn from(err: raw::rs_result) -> Error {
+        match err {
+            raw::RS_DONE => Error::Done,
+            raw::RS_BLOCKED => Error::Blocked,
+            raw::RS_RUNNING => Error::Running,
+            raw::RS_TEST_SKIPPED => Error::TestSkipped,
+            raw::RS_IO_ERROR => Error::Io(other_io_err("Unknown IO error from librsync")),
+            raw::RS_SYNTAX_ERROR => Error::Syntax,
+            raw::RS_MEM_ERROR => Error::Mem,
+            raw::RS_INPUT_ENDED => Error::InputEnded,
+            raw::RS_BAD_MAGIC => Error::BadMagic,
+            raw::RS_UNIMPLEMENTED => Error::Unimplemented,
+            raw::RS_CORRUPT => Error::Corrupt,
+            raw::RS_INTERNAL_ERROR => Error::Internal,
+            raw::RS_PARAM_ERROR => Error::Param,
+            n => Error::Unknown(n),
         }
     }
 }

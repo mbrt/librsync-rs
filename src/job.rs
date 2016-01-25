@@ -1,8 +1,9 @@
 use std::io::{self, Read};
 use std::marker::PhantomData;
 use std::ops::Deref;
+use std::ptr;
 
-use {Error, other_io_err, raw};
+use {Error, raw};
 
 
 pub struct JobDriver<R: Read> {
@@ -39,6 +40,47 @@ impl<R: Read> JobDriver<R> {
     pub fn into_inner(self) -> R {
         self.input
     }
+
+    /// Complete the job by working without an output buffer.
+    ///
+    /// If the job needs to write some data, an `ErrorKind::WouldBlock` error is returned.
+    pub fn consume_input(&mut self) -> io::Result<()> {
+        loop {
+            if self.cap == 0 && !self.input_ended {
+                // need to read some data from input
+                let read = try!(self.input.read(&mut self.buf));
+                if read == 0 {
+                    self.input_ended = true;
+                }
+                self.pos = 0;
+                self.cap = read;
+            }
+
+            // work
+            let mut buffers = Buffers::with_no_out(&self.buf[self.pos..self.pos + self.cap],
+                                                   self.input_ended);
+            let res = unsafe { raw::rs_job_iter(*self.job, buffers.as_raw()) };
+            match res {
+                raw::RS_DONE => (),
+                raw::RS_BLOCKED => {
+                    return Err(io::Error::new(io::ErrorKind::WouldBlock,
+                                              "Cannot consume input without an output buffer"));
+                }
+                _ => {
+                    let err = Error::from(res);
+                    return Err(io::Error::new(io::ErrorKind::Other, err));
+                }
+            };
+
+            // update buffer cap and pos
+            let read = self.cap - buffers.available_input();
+            self.pos += read;
+            self.cap -= read;
+            if self.input_ended {
+                return Ok(());
+            }
+        }
+    }
 }
 
 impl<R: Read> Read for JobDriver<R> {
@@ -63,8 +105,8 @@ impl<R: Read> Read for JobDriver<R> {
                                            self.input_ended);
             let res = unsafe { raw::rs_job_iter(*self.job, buffers.as_raw()) };
             if res != raw::RS_DONE && res != raw::RS_BLOCKED {
-                let err = Error::from_raw(res);
-                return Err(other_io_err(format!("Error processing signature: \'{:?}\'", err)));
+                let err = Error::from(res);
+                return Err(io::Error::new(io::ErrorKind::Other, err));
             }
 
             // update buffer cap and pos
@@ -109,6 +151,19 @@ impl<'a> Buffers<'a> {
                 eof_in: if eof_in { 1 } else { 0 },
                 next_out: out_buf.as_mut_ptr() as *mut i8,
                 avail_out: out_buf.len(),
+            },
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn with_no_out(in_buf: &'a [u8], eof_in: bool) -> Self {
+        Buffers {
+            inner: raw::rs_buffers_t {
+                next_in: in_buf.as_ptr() as *const i8,
+                avail_in: in_buf.len(),
+                eof_in: if eof_in { 1 } else { 0 },
+                next_out: ptr::null_mut(),
+                avail_out: 0,
             },
             _phantom: PhantomData,
         }
