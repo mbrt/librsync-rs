@@ -232,5 +232,6 @@ mod test {
         let mut job = Delta::new(input, sig).unwrap();
         let mut delta = Vec::new();
         let read = job.read_to_end(&mut delta).unwrap();
+        assert_eq!(read, delta.len());
     }
 }
