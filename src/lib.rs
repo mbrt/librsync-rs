@@ -204,18 +204,33 @@ mod test {
     use super::*;
     use std::io::{Cursor, Read};
 
+    const DATA: &'static str = "this is a string to be tested";
+    const DATA2: &'static str = "this is another string to be tested";
+
+    fn data_signature() -> Vec<u8> {
+        vec![0x72, 0x73, 0x01, 0x36, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x05, 0x1b, 0x21,
+             0x04, 0x8b, 0xad, 0x3c, 0xbd, 0x19, 0x09, 0x1d, 0x1b, 0x04, 0xf0, 0x9d, 0x1f, 0x64,
+             0x31, 0xde, 0x15, 0xf4, 0x04, 0x87, 0x60, 0x96, 0x19, 0x50, 0x39]
+    }
+
+
     #[test]
     fn signature() {
-        let data = "this is a string to be tested";
-        let cursor = Cursor::new(data);
+        let cursor = Cursor::new(DATA);
         let mut sig = Signature::new(cursor, 10, 5, SignatureType::MD4).unwrap();
         let mut signature = Vec::new();
         let read = sig.read_to_end(&mut signature).unwrap();
         assert_eq!(read, signature.len());
-        let expected = vec![0x72, 0x73, 0x01, 0x36, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,
-                            0x05, 0x1b, 0x21, 0x04, 0x8b, 0xad, 0x3c, 0xbd, 0x19, 0x09, 0x1d,
-                            0x1b, 0x04, 0xf0, 0x9d, 0x1f, 0x64, 0x31, 0xde, 0x15, 0xf4, 0x04,
-                            0x87, 0x60, 0x96, 0x19, 0x50, 0x39];
-        assert_eq!(signature, expected);
+        assert_eq!(signature, data_signature());
+    }
+
+    #[test]
+    fn delta() {
+        let sig = data_signature();
+        let sig = Cursor::new(sig);
+        let input = Cursor::new(DATA2);
+        let mut job = Delta::new(input, sig).unwrap();
+        let mut delta = Vec::new();
+        let read = job.read_to_end(&mut delta).unwrap();
     }
 }
