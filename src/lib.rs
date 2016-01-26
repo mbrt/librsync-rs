@@ -18,10 +18,7 @@ pub enum SignatureType {
 
 #[derive(Debug)]
 pub enum Error {
-    Done,
     Blocked,
-    Running,
-    TestSkipped,
     Io(io::Error),
     Syntax,
     Mem,
@@ -91,7 +88,19 @@ impl<R: Read> Delta<R> {
 
 impl error::Error for Error {
     fn description(&self) -> &str {
-        ""
+        match *self {
+            Error::Blocked => "blocked waiting for more data",
+            Error::Io(ref err) => err.description(),
+            Error::Syntax => "syntax error",
+            Error::Mem => "out of memory",
+            Error::InputEnded => "unexpected end of input file",
+            Error::BadMagic => "bad magic number given",
+            Error::Unimplemented => "unimplemented feature",
+            Error::Corrupt => "unbelievable value in stream",
+            Error::Internal => "internal error",
+            Error::Param => "bad parameter",
+            Error::Unknown(_) => "unknown error from librsync",
+        }
     }
 }
 
@@ -99,8 +108,8 @@ impl Display for Error {
     fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
         match *self {
             Error::Io(ref e) => write!(fmt, "{}", e),
-            Error::Unknown(n) => write!(fmt, "Unknown error {} from librsync", n),
-            _ => write!(fmt, "Error {:?} from librsync", self),
+            Error::Unknown(n) => write!(fmt, "unknown error {} from native library", n),
+            _ => write!(fmt, "{}", std::error::Error::description(self)),
         }
     }
 }
@@ -114,10 +123,7 @@ impl From<io::Error> for Error {
 impl From<raw::rs_result> for Error {
     fn from(err: raw::rs_result) -> Error {
         match err {
-            raw::RS_DONE => Error::Done,
             raw::RS_BLOCKED => Error::Blocked,
-            raw::RS_RUNNING => Error::Running,
-            raw::RS_TEST_SKIPPED => Error::TestSkipped,
             raw::RS_IO_ERROR => Error::Io(other_io_err("Unknown IO error from librsync")),
             raw::RS_SYNTAX_ERROR => Error::Syntax,
             raw::RS_MEM_ERROR => Error::Mem,
