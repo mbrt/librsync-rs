@@ -7,6 +7,7 @@ use job::{Job, JobDriver};
 use std::error;
 use std::fmt::{self, Display, Formatter};
 use std::io::{self, Read};
+use std::ops::Deref;
 use std::ptr;
 
 
@@ -39,7 +40,7 @@ pub struct Signature<R: Read> {
 
 pub struct Delta<R: Read> {
     driver: JobDriver<R>,
-    sumset: Sumset,
+    _sumset: Sumset,
 }
 
 
@@ -73,17 +74,35 @@ impl<R: Read> Read for Signature<R> {
 
 impl<R: Read> Delta<R> {
     pub fn new<R2: Read>(input: R, signature: R2) -> Result<Self> {
+        // load the signature
         let sumset = unsafe {
             let mut sumset = ptr::null_mut();
             let job = raw::rs_loadsig_begin(&mut sumset);
             assert!(!job.is_null());
             let mut job = JobDriver::new(signature, Job(job));
             try!(job.consume_input());
-            Sumset(sumset)
+            let sumset = Sumset(sumset);
+            let res = raw::rs_build_hash_table(*sumset);
+            if res != raw::RS_DONE {
+                return Err(Error::from(res));
+            }
+            sumset
         };
-        unimplemented!()
+        let job = unsafe { raw::rs_delta_begin(*sumset) };
+        assert!(!job.is_null());
+        Ok(Delta {
+            driver: JobDriver::new(input, Job(job)),
+            _sumset: sumset,
+        })
     }
 }
+
+impl<R: Read> Read for Delta<R> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.driver.read(buf)
+    }
+}
+
 
 
 impl error::Error for Error {
@@ -164,6 +183,13 @@ impl Drop for Sumset {
                 raw::rs_free_sumset(self.0);
             }
         }
+    }
+}
+
+impl Deref for Sumset {
+    type Target = *mut raw::rs_signature_t;
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
