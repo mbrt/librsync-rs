@@ -22,11 +22,9 @@ pub enum Error {
     Io(io::Error),
     Syntax,
     Mem,
-    InputEnded,
     BadMagic,
     Unimplemented,
     Internal,
-    Param,
     Unknown(i32),
 }
 
@@ -109,11 +107,9 @@ impl error::Error for Error {
             Error::Io(ref err) => err.description(),
             Error::Syntax => "syntax error",
             Error::Mem => "out of memory",
-            Error::InputEnded => "unexpected end of input file",
             Error::BadMagic => "bad magic number given",
             Error::Unimplemented => "unimplemented feature",
             Error::Internal => "internal error",
-            Error::Param => "bad parameter",
             Error::Unknown(_) => "unknown error from librsync",
         }
     }
@@ -138,22 +134,18 @@ impl From<io::Error> for Error {
 impl From<raw::rs_result> for Error {
     fn from(err: raw::rs_result) -> Error {
         match err {
-            raw::RS_BLOCKED => {
-                Error::Io(io::Error::new(io::ErrorKind::WouldBlock,
-                                         "blocked waiting for more data"))
-            }
-            raw::RS_IO_ERROR => Error::Io(other_io_err("unknown IO error from librsync")),
+            raw::RS_BLOCKED => io_err(io::ErrorKind::WouldBlock, "blocked waiting for more data"),
+            raw::RS_IO_ERROR => io_err(io::ErrorKind::Other, "unknown IO error from librsync"),
             raw::RS_SYNTAX_ERROR => Error::Syntax,
             raw::RS_MEM_ERROR => Error::Mem,
-            raw::RS_INPUT_ENDED => Error::InputEnded,
+            raw::RS_INPUT_ENDED => {
+                io_err(io::ErrorKind::UnexpectedEof, "unexpected end of input file")
+            }
             raw::RS_BAD_MAGIC => Error::BadMagic,
             raw::RS_UNIMPLEMENTED => Error::Unimplemented,
-            raw::RS_CORRUPT => {
-                Error::Io(io::Error::new(io::ErrorKind::InvalidData,
-                                         "unbelievable value in stream"))
-            }
+            raw::RS_CORRUPT => io_err(io::ErrorKind::InvalidData, "unbelievable value in stream"),
             raw::RS_INTERNAL_ERROR => Error::Internal,
-            raw::RS_PARAM_ERROR => Error::Param,
+            raw::RS_PARAM_ERROR => io_err(io::ErrorKind::InvalidInput, "bad parameter"),
             n => Error::Unknown(n),
         }
     }
@@ -196,8 +188,10 @@ impl Deref for Sumset {
 }
 
 
-fn other_io_err<T: AsRef<str>>(msg: T) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, msg.as_ref())
+fn io_err<E>(kind: io::ErrorKind, e: E) -> Error
+    where E: Into<Box<error::Error + Send + Sync>>
+{
+    Error::Io(io::Error::new(kind, e))
 }
 
 
