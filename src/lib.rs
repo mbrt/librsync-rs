@@ -19,14 +19,12 @@ pub enum SignatureType {
 
 #[derive(Debug)]
 pub enum Error {
-    Blocked,
     Io(io::Error),
     Syntax,
     Mem,
     InputEnded,
     BadMagic,
     Unimplemented,
-    Corrupt,
     Internal,
     Param,
     Unknown(i32),
@@ -57,7 +55,7 @@ impl<R: Read> Signature<R> {
         if job.is_null() {
             return Err(Error::BadMagic);
         }
-        Ok(Signature { driver: JobDriver::new(old, Job(job)), })
+        Ok(Signature { driver: JobDriver::new(old, Job(job)) })
     }
 
     pub fn into_inner(self) -> R {
@@ -108,14 +106,12 @@ impl<R: Read> Read for Delta<R> {
 impl error::Error for Error {
     fn description(&self) -> &str {
         match *self {
-            Error::Blocked => "blocked waiting for more data",
             Error::Io(ref err) => err.description(),
             Error::Syntax => "syntax error",
             Error::Mem => "out of memory",
             Error::InputEnded => "unexpected end of input file",
             Error::BadMagic => "bad magic number given",
             Error::Unimplemented => "unimplemented feature",
-            Error::Corrupt => "unbelievable value in stream",
             Error::Internal => "internal error",
             Error::Param => "bad parameter",
             Error::Unknown(_) => "unknown error from librsync",
@@ -142,14 +138,20 @@ impl From<io::Error> for Error {
 impl From<raw::rs_result> for Error {
     fn from(err: raw::rs_result) -> Error {
         match err {
-            raw::RS_BLOCKED => Error::Blocked,
-            raw::RS_IO_ERROR => Error::Io(other_io_err("Unknown IO error from librsync")),
+            raw::RS_BLOCKED => {
+                Error::Io(io::Error::new(io::ErrorKind::WouldBlock,
+                                         "blocked waiting for more data"))
+            }
+            raw::RS_IO_ERROR => Error::Io(other_io_err("unknown IO error from librsync")),
             raw::RS_SYNTAX_ERROR => Error::Syntax,
             raw::RS_MEM_ERROR => Error::Mem,
             raw::RS_INPUT_ENDED => Error::InputEnded,
             raw::RS_BAD_MAGIC => Error::BadMagic,
             raw::RS_UNIMPLEMENTED => Error::Unimplemented,
-            raw::RS_CORRUPT => Error::Corrupt,
+            raw::RS_CORRUPT => {
+                Error::Io(io::Error::new(io::ErrorKind::InvalidData,
+                                         "unbelievable value in stream"))
+            }
             raw::RS_INTERNAL_ERROR => Error::Internal,
             raw::RS_PARAM_ERROR => Error::Param,
             n => Error::Unknown(n),
