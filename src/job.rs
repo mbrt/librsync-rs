@@ -60,15 +60,30 @@ impl<R: Read> JobDriver<R> {
             let mut buffers = Buffers::with_no_out(&self.buf[self.pos..self.pos + self.cap],
                                                    self.input_ended);
             let res = unsafe { raw::rs_job_iter(*self.job, buffers.as_raw()) };
-            if res != raw::RS_DONE && res != raw::RS_BLOCKED {
-                let err = Error::from(res);
-                return Err(io::Error::new(io::ErrorKind::Other, err));
-            }
-
             // update buffer cap and pos
             let read = self.cap - buffers.available_input();
             self.pos += read;
             self.cap -= read;
+
+            // determine result
+            // NOTE: this should be done here, after the input buffer update, because we need to
+            // know if the possible RS_BLOCKED result is due to a full input, or to an empty output
+            // buffer
+            match res {
+                raw::RS_DONE => (),
+                raw::RS_BLOCKED => {
+                    if self.cap > 0 {
+                        // the block is due to a missing output buffer
+                        return Err(io::Error::new(io::ErrorKind::WouldBlock,
+                                                  "cannot consume input without an output buffer"));
+                    }
+                }
+                _ => {
+                    let err = Error::from(res);
+                    return Err(io::Error::new(io::ErrorKind::Other, err));
+                }
+            };
+
             if self.input_ended {
                 return Ok(());
             }
