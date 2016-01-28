@@ -10,6 +10,7 @@
 extern crate librsync_sys as raw;
 extern crate libc;
 
+mod macros;
 mod job;
 
 use job::{Job, JobDriver};
@@ -51,10 +52,15 @@ pub struct Delta<R> {
     _sumset: Sumset,
 }
 
+pub struct Patch<'a, R> {
+    driver: JobDriver<R>,
+    _base: Box<StreamHolder<'a>>,
+}
+
 
 struct Sumset(*mut raw::rs_signature_t);
 
-struct StreamHolder(Box<ReadAndSeek>);
+struct StreamHolder<'a>(Box<ReadAndSeek + 'a>);
 
 // workaround for E0225
 trait ReadAndSeek: Read + Seek {}
@@ -113,6 +119,29 @@ impl<R: Read> Delta<R> {
 }
 
 impl<R: Read> Read for Delta<R> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.driver.read(buf)
+    }
+}
+
+
+impl<'a, R: Read> Patch<'a, R> {
+    pub fn new<B: Read + Seek + 'a>(base: B, delta: R) -> Result<Self> {
+        let mut baseh = Box::new(StreamHolder(Box::new(base)));
+        let job = unsafe { raw::rs_patch_begin(patch_copy_cb, baseh.as_raw()) };
+        assert!(!job.is_null());
+        Ok(Patch {
+            driver: JobDriver::new(delta, Job(job)),
+            _base: baseh,
+        })
+    }
+
+    pub fn into_delta(self) -> R {
+        self.driver.into_inner()
+    }
+}
+
+impl<'a, R: Read> Read for Patch<'a, R> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.driver.read(buf)
     }
@@ -206,9 +235,13 @@ impl Deref for Sumset {
     }
 }
 
-impl StreamHolder {
+impl<'a> StreamHolder<'a> {
     fn as_stream(&mut self) -> &mut ReadAndSeek {
         &mut *self.0
+    }
+
+    unsafe fn as_raw(&mut self) -> *mut libc::c_void {
+        mem::transmute(self)
     }
 }
 
@@ -226,14 +259,10 @@ extern "C" fn patch_copy_cb(opaque: *mut libc::c_void,
         let buf: *mut u8 = mem::transmute(*buf);
         slice::from_raw_parts_mut(buf, *len)
     };
-    input.seek(io::SeekFrom::Start(pos as u64));
-    match input.read(output) {
-        Ok(n) => {
-            unsafe { *len += n };
-            raw::RS_DONE
-        }
-        Err(_) => raw::RS_IO_ERROR,
-    }
+    try_or_rs_error!(input.seek(io::SeekFrom::Start(pos as u64)));
+    let n = try_or_rs_error!(input.read(output));
+    unsafe { *len += n };
+    raw::RS_DONE
 }
 
 
