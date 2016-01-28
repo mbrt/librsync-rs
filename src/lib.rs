@@ -8,6 +8,7 @@
 #![cfg_attr(feature = "lints", plugin(clippy))]
 
 extern crate librsync_sys as raw;
+extern crate libc;
 
 mod job;
 
@@ -15,9 +16,11 @@ use job::{Job, JobDriver};
 
 use std::error;
 use std::fmt::{self, Display, Formatter};
-use std::io::{self, Read};
+use std::io::{self, Read, Seek};
 use std::ops::Deref;
+use std::mem;
 use std::ptr;
+use std::slice;
 
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -50,6 +53,13 @@ pub struct Delta<R> {
 
 
 struct Sumset(*mut raw::rs_signature_t);
+
+struct StreamHolder(Box<ReadAndSeek>);
+
+// workaround for E0225
+trait ReadAndSeek: Read + Seek {}
+impl<T: Read + Seek> ReadAndSeek for T {}
+
 
 
 impl<R: Read> Signature<R> {
@@ -193,6 +203,36 @@ impl Deref for Sumset {
     type Target = *mut raw::rs_signature_t;
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl StreamHolder {
+    fn as_stream(&mut self) -> &mut ReadAndSeek {
+        &mut *self.0
+    }
+}
+
+
+extern "C" fn patch_copy_cb(opaque: *mut libc::c_void,
+                            pos: raw::rs_long_t,
+                            len: *mut libc::size_t,
+                            buf: *mut *mut libc::c_void)
+                            -> raw::rs_result {
+    let input = unsafe {
+        let h: *mut StreamHolder = mem::transmute(opaque);
+        (*h).as_stream()
+    };
+    let output = unsafe {
+        let buf: *mut u8 = mem::transmute(*buf);
+        slice::from_raw_parts_mut(buf, *len)
+    };
+    input.seek(io::SeekFrom::Start(pos as u64));
+    match input.read(output) {
+        Ok(n) => {
+            unsafe { *len += n };
+            raw::RS_DONE
+        }
+        Err(_) => raw::RS_IO_ERROR,
     }
 }
 
