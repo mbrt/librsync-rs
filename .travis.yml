@@ -32,6 +32,9 @@ script:
   - travis-cargo build
   - travis-cargo test
 
+after_success:
+  - travis-cargo coveralls --no-sudo
+
 notifications:
   email:
     on_success: never
