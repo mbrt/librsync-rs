@@ -308,4 +308,17 @@ mod test {
         let read = job.read_to_end(&mut delta).unwrap();
         assert_eq!(read, delta.len());
     }
+
+    #[test]
+    fn patch() {
+        let base = Cursor::new(DATA);
+        let new = Cursor::new(DATA2);
+        let sig = Signature::new(base, 10, 5, SignatureType::MD4).unwrap();
+        let delta = Delta::new(new, sig).unwrap();
+        let base = Cursor::new(DATA);
+        let mut patch = Patch::new(base, delta).unwrap();
+        let mut computed_new = String::new();
+        patch.read_to_string(&mut computed_new).unwrap();
+        assert_eq!(computed_new, DATA2);
+    }
 }
