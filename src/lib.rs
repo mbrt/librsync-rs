@@ -30,11 +30,11 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub struct Signature<R: Read> {
+pub struct Signature<R> {
     driver: JobDriver<R>,
 }
 
-pub struct Delta<R: Read> {
+pub struct Delta<R> {
     driver: JobDriver<R>,
     _sumset: Sumset,
 }
@@ -69,7 +69,7 @@ impl<R: Read> Read for Signature<R> {
 
 
 impl<R: Read> Delta<R> {
-    pub fn new<R2: Read>(input: R, signature: R2) -> Result<Self> {
+    pub fn new<S: Read>(input: R, signature: S) -> Result<Self> {
         // load the signature
         let sumset = unsafe {
             let mut sumset = ptr::null_mut();

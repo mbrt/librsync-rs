@@ -6,7 +6,7 @@ use std::ptr;
 use {Error, raw};
 
 
-pub struct JobDriver<R: Read> {
+pub struct JobDriver<R> {
     input: R,
     job: Job,
     buf: Vec<u8>,
