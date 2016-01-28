@@ -1,3 +1,12 @@
+#![deny(missing_copy_implementations,
+        trivial_casts, trivial_numeric_casts,
+        unstable_features,
+        unused_import_braces, unused_qualifications)]
+
+#![cfg_attr(feature = "nightly", allow(unstable_features))]
+#![cfg_attr(feature = "lints", feature(plugin))]
+#![cfg_attr(feature = "lints", plugin(clippy))]
+
 extern crate librsync_sys as raw;
 
 mod job;

@@ -182,10 +182,10 @@ impl<'a> Buffers<'a> {
     }
 
     pub fn available_input(&self) -> usize {
-        self.inner.avail_in as usize
+        self.inner.avail_in
     }
 
     pub fn available_output(&self) -> usize {
-        self.inner.avail_out as usize
+        self.inner.avail_out
     }
 }
