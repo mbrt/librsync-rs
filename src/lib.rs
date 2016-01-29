@@ -260,8 +260,7 @@ extern "C" fn patch_copy_cb(opaque: *mut libc::c_void,
         slice::from_raw_parts_mut(buf, *len)
     };
     try_or_rs_error!(input.seek(io::SeekFrom::Start(pos as u64)));
-    let n = try_or_rs_error!(input.read(output));
-    unsafe { *len += n };
+    try_or_rs_error!(input.read(output));
     raw::RS_DONE
 }
 
