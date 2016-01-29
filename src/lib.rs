@@ -281,10 +281,17 @@ mod test {
     const DATA: &'static str = "this is a string to be tested";
     const DATA2: &'static str = "this is another string to be tested";
 
+    // generated with `rdiff signature -b 10 -S 5 data data.sig`
     fn data_signature() -> Vec<u8> {
         vec![0x72, 0x73, 0x01, 0x36, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x05, 0x1b, 0x21,
              0x04, 0x8b, 0xad, 0x3c, 0xbd, 0x19, 0x09, 0x1d, 0x1b, 0x04, 0xf0, 0x9d, 0x1f, 0x64,
              0x31, 0xde, 0x15, 0xf4, 0x04, 0x87, 0x60, 0x96, 0x19, 0x50, 0x39]
+    }
+
+    // generated with `rdiff delta data.sig data2 data2.delta`
+    fn data2_delta() -> Vec<u8> {
+        vec![0x72, 0x73, 0x02, 0x36, 0x41, 0x10, 0x74, 0x68, 0x69, 0x73, 0x20, 0x69, 0x73, 0x20,
+             0x61, 0x6e, 0x6f, 0x74, 0x68, 0x65, 0x72, 0x20, 0x45, 0x0a, 0x13, 0x00]
     }
 
 
@@ -307,10 +314,22 @@ mod test {
         let mut delta = Vec::new();
         let read = job.read_to_end(&mut delta).unwrap();
         assert_eq!(read, delta.len());
+        assert_eq!(delta, data2_delta());
     }
 
     #[test]
     fn patch() {
+        let base = Cursor::new(DATA);
+        let delta = data2_delta();
+        let delta = Cursor::new(delta);
+        let mut patch = Patch::new(base, delta).unwrap();
+        let mut computed_new = String::new();
+        patch.read_to_string(&mut computed_new).unwrap();
+        assert_eq!(computed_new, DATA2);
+    }
+
+    #[test]
+    fn integration() {
         let base = Cursor::new(DATA);
         let new = Cursor::new(DATA2);
         let sig = Signature::new(base, 10, 5, SignatureType::MD4).unwrap();
