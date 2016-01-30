@@ -14,16 +14,16 @@ fn main() {
     }
 
     let cfg_dir = {
-        let mut p = Path::new("config").to_path_buf();
+        let mut p = Path::new("librsync/static").to_path_buf();
         p.push(target);
         p
     };
 
     cfg.include(cfg_dir)
-       .include("prototab")
+       .include("librsync/static")
        .include("librsync/src")
        .define("STDC_HEADERS", Some("1"))
-       .file("prototab/prototab.c")
+       .file("librsync/static/prototab.c")
        .file("librsync/src/base64.c")
        .file("librsync/src/buf.c")
        .file("librsync/src/checksum.c")
