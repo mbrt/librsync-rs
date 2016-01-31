@@ -22,11 +22,5 @@ install:
 build_script:
   - cargo build --verbose
 
-on_failure:
-  - cd librsync-sys/librsync/gen
-  - cargo run
-  - ps: Get-Content "../static/${env:TARGET}/librsync-config.h"
-  - ps: Get-Content "../static/${env:TARGET}/config.h"
-
 test_script:
   - cargo test -- --nocapture
