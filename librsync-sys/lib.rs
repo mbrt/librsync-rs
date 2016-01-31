@@ -23,6 +23,16 @@ pub const RS_CORRUPT: c_int = 106;
 pub const RS_INTERNAL_ERROR: c_int = 107;
 pub const RS_PARAM_ERROR: c_int = 108;
 
+pub type rs_loglevel = c_int;
+pub const RS_LOG_EMERG: c_int = 0;
+pub const RS_LOG_ALERT: c_int = 1;
+pub const RS_LOG_CRIT: c_int = 2;
+pub const RS_LOG_ERR: c_int = 3;
+pub const RS_LOG_WARNING: c_int = 4;
+pub const RS_LOG_NOTICE: c_int = 5;
+pub const RS_LOG_INFO: c_int = 6;
+pub const RS_LOG_DEBUG: c_int = 7;
+
 pub const RS_DEFAULT_BLOCK_LEN: size_t = 2048;
 
 pub type rs_long_t = c_longlong;
@@ -48,6 +58,7 @@ pub type rs_copy_cb = extern "C" fn(opaque: *mut c_void,
                                     len: *mut size_t,
                                     buf: *mut *mut c_void)
                                     -> rs_result;
+pub type rs_trace_fn_t = extern "C" fn(level: rs_loglevel, *const c_char);
 
 
 extern "C" {
@@ -70,4 +81,7 @@ extern "C" {
     pub fn rs_build_hash_table(sums: *mut rs_signature_t) -> rs_result;
     pub fn rs_free_sumset(sums: *mut rs_signature_t);
     pub fn rs_patch_begin(copy_cb: rs_copy_cb, copy_arg: *mut c_void) -> *mut rs_job_t;
+
+    pub fn rs_trace_set_level(level: rs_loglevel);
+    pub fn rs_trace_to(f: rs_trace_fn_t);
 }
