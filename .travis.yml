@@ -16,6 +16,7 @@ addons:
 
 os:
   - linux
+  - osx
 
 cache:
   directories:
@@ -26,14 +27,16 @@ matrix:
     - rust: nightly
 
 before_script:
-  - pip install 'travis-cargo<0.2' --user && export PATH=$HOME/.local/bin:$PATH
+  - pip install 'travis-cargo<0.2' --user && export PATH=`python -m site --user-base`/bin:$PATH
 
 script:
   - travis-cargo build
   - travis-cargo test
 
 after_success:
-  - travis-cargo coveralls --no-sudo
+  - if [ "$TRAVIS_OS_NAME" == 'linux' ]; then
+      travis-cargo coveralls --no-sudo;
+    fi
 
 notifications:
   email:
