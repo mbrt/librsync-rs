@@ -67,7 +67,6 @@ trait ReadAndSeek: Read + Seek {}
 impl<T: Read + Seek> ReadAndSeek for T {}
 
 
-
 impl<R: Read> Signature<R> {
     pub fn new(old: R,
                new_block_len: usize,
@@ -110,7 +109,9 @@ impl<R: Read> Delta<R> {
             sumset
         };
         let job = unsafe { raw::rs_delta_begin(*sumset) };
-        assert!(!job.is_null());
+        if job.is_null() {
+            return Err(io_err(io::ErrorKind::InvalidData, "invalid signature given"));
+        }
         Ok(Delta {
             driver: JobDriver::new(input, Job(job)),
             _sumset: sumset,
@@ -146,7 +147,6 @@ impl<'a, R: Read> Read for Patch<'a, R> {
         self.driver.read(buf)
     }
 }
-
 
 
 impl error::Error for Error {
@@ -201,14 +201,6 @@ impl From<raw::rs_result> for Error {
 
 
 impl SignatureType {
-    pub fn from_raw(raw: raw::rs_magic_number) -> Option<Self> {
-        match raw {
-            raw::RS_MD4_SIG_MAGIC => Some(SignatureType::MD4),
-            raw::RS_BLAKE2_SIG_MAGIC => Some(SignatureType::Blake2),
-            _ => None,
-        }
-    }
-
     fn as_raw(&self) -> raw::rs_magic_number {
         match *self {
             SignatureType::MD4 => raw::RS_MD4_SIG_MAGIC,
@@ -235,13 +227,14 @@ impl Deref for Sumset {
     }
 }
 
+
 impl<'a> StreamHolder<'a> {
     fn as_stream(&mut self) -> &mut ReadAndSeek {
         &mut *self.0
     }
 
-    unsafe fn as_raw(&mut self) -> *mut libc::c_void {
-        mem::transmute(self)
+    fn as_raw(&mut self) -> *mut libc::c_void {
+        unsafe { mem::transmute(self) }
     }
 }
 
