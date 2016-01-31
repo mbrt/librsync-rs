@@ -49,27 +49,16 @@ pub struct rs_buffers_t {
     pub avail_out: size_t,
 }
 
-pub type rs_driven_cb = extern "C" fn(job: *mut rs_job_t,
-                                      buf: *mut rs_buffers_t,
-                                      opaque: *mut c_void)
-                                      -> rs_result;
 pub type rs_copy_cb = extern "C" fn(opaque: *mut c_void,
                                     pos: rs_long_t,
                                     len: *mut size_t,
                                     buf: *mut *mut c_void)
                                     -> rs_result;
-pub type rs_trace_fn_t = extern "C" fn(level: rs_loglevel, *const c_char);
+pub type rs_trace_fn_t = extern "C" fn(level: rs_loglevel, msg: *const c_char);
 
 
 extern "C" {
     pub fn rs_job_iter(job: *mut rs_job_t, buffers: *mut rs_buffers_t) -> rs_result;
-    pub fn fs_job_drive(job: *mut rs_job_t,
-                        buf: *mut rs_buffers_t,
-                        in_cb: rs_driven_cb,
-                        in_opaque: *mut c_void,
-                        out_cb: rs_driven_cb,
-                        out_opaque: *mut c_void)
-                        -> rs_result;
     pub fn rs_job_free(job: *mut rs_job_t) -> rs_result;
 
     pub fn rs_sig_begin(new_block_len: size_t,

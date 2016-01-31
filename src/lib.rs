@@ -9,9 +9,12 @@
 
 extern crate librsync_sys as raw;
 extern crate libc;
+#[macro_use]
+extern crate log;
 
 mod macros;
 mod job;
+mod logfwd;
 
 use job::{Job, JobDriver};
 
@@ -73,6 +76,7 @@ impl<R: Read> Signature<R> {
                strong_len: usize,
                sig_magic: SignatureType)
                -> Result<Self> {
+        logfwd::init();
         let job = unsafe { raw::rs_sig_begin(new_block_len, strong_len, sig_magic.as_raw()) };
         if job.is_null() {
             return Err(Error::BadMagic);
@@ -94,6 +98,7 @@ impl<R: Read> Read for Signature<R> {
 
 impl<R: Read> Delta<R> {
     pub fn new<S: Read>(input: R, signature: S) -> Result<Self> {
+        logfwd::init();
         // load the signature
         let sumset = unsafe {
             let mut sumset = ptr::null_mut();
@@ -128,6 +133,8 @@ impl<R: Read> Read for Delta<R> {
 
 impl<'a, R: Read> Patch<'a, R> {
     pub fn new<B: Read + Seek + 'a>(base: B, delta: R) -> Result<Self> {
+        logfwd::init();
+
         let mut baseh = Box::new(StreamHolder(Box::new(base)));
         let job = unsafe { raw::rs_patch_begin(patch_copy_cb, baseh.as_raw()) };
         assert!(!job.is_null());
