@@ -2,7 +2,7 @@ use std::sync::{ONCE_INIT, Once};
 use std::ffi::CStr;
 
 use libc::c_char;
-use log::LogLevel;
+use log::{self, LogLevel, LogLevelFilter};
 
 use raw;
 
@@ -15,7 +15,18 @@ pub fn init() {
 
     unsafe {
         INIT.call_once(|| {
+            // trace to our callback
             raw::rs_trace_to(trace);
+
+            // determine log level
+            // this is useful because if the setted level is not Debug we can optimize librsync log
+            // calls
+            let level = match log::max_log_level() {
+                LogLevelFilter::Info => raw::RS_LOG_NOTICE,
+                LogLevelFilter::Debug | LogLevelFilter::Trace => raw::RS_LOG_DEBUG,
+                _ => raw::RS_LOG_WARNING,
+            };
+            raw::rs_trace_set_level(level);
         });
     }
 }
