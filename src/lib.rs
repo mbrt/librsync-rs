@@ -9,6 +9,7 @@
 
 extern crate librsync_sys as raw;
 extern crate libc;
+#[cfg(feature = "log")]
 #[macro_use]
 extern crate log;
 

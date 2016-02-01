@@ -13,7 +13,7 @@ deltas exposed as Reader/Writer streams.
 """
 
 [features]
-default = []
+default = ["log"] # forward logs to log crate, or disable them
 lints = ["clippy", "nightly"]
 nightly = [] # for building with nightly and unstable features
 unstable = ["lints", "nightly"] # for building with travis-cargo
@@ -22,4 +22,4 @@ unstable = ["lints", "nightly"] # for building with travis-cargo
 libc = "0.2"
 librsync-sys = { version = "0.1", path = "librsync-sys" }
 clippy = { version = "*", optional = true }
-log = "0.3"
+log = { version = "0.3", optional = true }
