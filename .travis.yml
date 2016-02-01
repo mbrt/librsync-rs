@@ -18,6 +18,10 @@ os:
   - linux
   - osx
 
+env:
+  - CARGO_FEATURES="--features default"
+  - CARGO_FEATURES="--no-default-features"
+
 cache:
   directories:
     - $HOME/.cargo
@@ -25,13 +29,16 @@ cache:
 matrix:
   allow_failures:
     - rust: nightly
+  exclude:
+    - os: osx
+      env: CARGO_FEATURES="--no-default-features"
 
 before_script:
   - pip install 'travis-cargo<0.2' --user && export PATH=`python -m site --user-base`/bin:$PATH
 
 script:
-  - travis-cargo build
-  - travis-cargo test
+  - travis-cargo build -- $CARGO_FEATURES
+  - travis-cargo test -- $CARGO_FEATURES
 
 after_success:
   - if [ "$TRAVIS_OS_NAME" == 'linux' ]; then
