@@ -16,6 +16,7 @@ extern crate log;
 mod macros;
 mod job;
 mod logfwd;
+pub mod whole;
 
 use job::{Job, JobDriver};
 
@@ -72,17 +73,17 @@ impl<T: Read + Seek> ReadAndSeek for T {}
 
 
 impl<R: Read> Signature<R> {
-    pub fn new(old: R,
-               new_block_len: usize,
+    pub fn new(input: R,
+               block_len: usize,
                strong_len: usize,
                sig_magic: SignatureType)
                -> Result<Self> {
         logfwd::init();
-        let job = unsafe { raw::rs_sig_begin(new_block_len, strong_len, sig_magic.as_raw()) };
+        let job = unsafe { raw::rs_sig_begin(block_len, strong_len, sig_magic.as_raw()) };
         if job.is_null() {
             return Err(Error::BadMagic);
         }
-        Ok(Signature { driver: JobDriver::new(old, Job(job)) })
+        Ok(Signature { driver: JobDriver::new(input, Job(job)) })
     }
 
     pub fn into_inner(self) -> R {
@@ -98,14 +99,14 @@ impl<R: Read> Read for Signature<R> {
 
 
 impl<R: Read> Delta<R> {
-    pub fn new<S: Read>(input: R, signature: S) -> Result<Self> {
+    pub fn new<S: Read>(new: R, base_sig: S) -> Result<Self> {
         logfwd::init();
         // load the signature
         let sumset = unsafe {
             let mut sumset = ptr::null_mut();
             let job = raw::rs_loadsig_begin(&mut sumset);
             assert!(!job.is_null());
-            let mut job = JobDriver::new(signature, Job(job));
+            let mut job = JobDriver::new(base_sig, Job(job));
             try!(job.consume_input());
             let sumset = Sumset(sumset);
             let res = raw::rs_build_hash_table(*sumset);
@@ -119,9 +120,13 @@ impl<R: Read> Delta<R> {
             return Err(io_err(io::ErrorKind::InvalidData, "invalid signature given"));
         }
         Ok(Delta {
-            driver: JobDriver::new(input, Job(job)),
+            driver: JobDriver::new(new, Job(job)),
             _sumset: sumset,
         })
+    }
+
+    pub fn into_inner(self) -> R {
+        self.driver.into_inner()
     }
 }
 
