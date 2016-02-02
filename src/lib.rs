@@ -1,3 +1,60 @@
+//! librsync bindings for Rust.
+//!
+//! This library contains bindings to librsync[1], to support computation and application of
+//! network deltas, used in rsync and duplicity backup applications. This library encapsulates the
+//! algorithms of the rsync protocol, which computes differences between files efficiently.
+//!
+//! The rsync protocol, when computes differences, does not require the presence of both files.
+//! It needs instead the new file and a set of checksums of the first file (namely the signature).
+//! Computed differences can be stored in a delta file. The rsync protocol is then able to
+//! reproduce the new file, by having the old one and the delta.
+//!
+//! [1]: http://librsync.sourcefrog.net/
+//!
+//!
+//! # Overview of types and modules
+//!
+//! This crate provides the streaming operations to produce signatures, delta and patches in the
+//! top-level module, with `Signature`, `Delta` and `Patch` structs. Those structs take some input
+//! stream (`Read` or `Read + Seek` traits) and implement another stream (`Read` trait) from which
+//! the output can be read.
+//!
+//! Higher level operations are provided within the `whole` submodule. If the application does not
+//! need fine-grained control over IO operations, `sig`, `delta` and `patch` submodules can be
+//! used. Those functions apply the algorithms to an output stream (implementing the `Write` trait)
+//! in a single call.
+//!
+//!
+//! # Example: streams
+//!
+//! This example shows how to go trough the streaming APIs, starting from an input string and a
+//! modified string which act as old and new files.
+//!
+//! ```rust
+//! use std::io::prelude::*;
+//! use std::io::Cursor;
+//! use librsync::{Delta, Patch, Signature, SignatureType};
+//!
+//! let base = "base file".as_bytes();
+//! let new = "base file (modified)".as_bytes();
+//!
+//! // create signature starting from base file
+//! let sig = Signature::new(base, 10, 5, SignatureType::Blake2).unwrap();
+//! // create delta from new file and the base signature
+//! let delta = Delta::new(new, sig).unwrap();
+//! // create and store the new file from the base one and the delta
+//! let mut patch = Patch::new(Cursor::new(base), delta).unwrap();
+//! let mut computed_new = Vec::new();
+//! patch.read_to_end(&mut computed_new).unwrap();
+//!
+//! // test whether the computed file is exactly the new file, as expected
+//! assert_eq!(computed_new, new);
+//! ```
+//!
+//! Note that intermediate results are not stored anywhere. For example the `Signature` type is
+//! directly used to feed the delta operation. This is possible because of the streaming fashon of
+//! the operations.
+
 #![deny(missing_copy_implementations,
         trivial_casts, trivial_numeric_casts,
         unstable_features,
