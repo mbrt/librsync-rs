@@ -242,7 +242,7 @@ impl<R: Read> Delta<R> {
     /// Creates a new delta stream.
     ///
     /// This constructor takes two `Read` streams for the new file (`new` parameter) and for the
-    /// signatures of the base file (`base_sig` parameter). It produces a delta stream from wich
+    /// signatures of the base file (`base_sig` parameter). It produces a delta stream from which
     /// read the resulting delta file.
     pub fn new<S: Read>(new: R, base_sig: S) -> Result<Self> {
         logfwd::init();
@@ -284,6 +284,11 @@ impl<R: Read> Read for Delta<R> {
 
 
 impl<'a, R: Read> Patch<'a, R> {
+    /// Creates a new patch stream.
+    ///
+    /// This constructor takes a `Read + Seek` stream for the basis file (`base` parameter), and a
+    /// `Read` stream for the delta file (`delta` parameter). It produces a stream from which read
+    /// the resulting patched file.
     pub fn new<B: Read + Seek + 'a>(base: B, delta: R) -> Result<Self> {
         logfwd::init();
 
@@ -296,6 +301,7 @@ impl<'a, R: Read> Patch<'a, R> {
         })
     }
 
+    /// Unwraps this stream and returns the underlying delta stream.
     pub fn into_delta(self) -> R {
         self.driver.into_inner()
     }

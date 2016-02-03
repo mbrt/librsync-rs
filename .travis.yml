@@ -6,6 +6,14 @@ rust:
   - beta
   - nightly
 
+os:
+  - linux
+  - osx
+
+env:
+  - CARGO_FEATURES='--features default'
+  - CARGO_FEATURES='--no-default-features'
+
 # necessary for `travis-cargo coveralls --no-sudo`
 addons:
   apt:
@@ -13,14 +21,6 @@ addons:
       - libcurl4-openssl-dev
       - libelf-dev
       - libdw-dev
-
-os:
-  - linux
-  - osx
-
-env:
-  - CARGO_FEATURES="--features default"
-  - CARGO_FEATURES="--no-default-features"
 
 cache:
   directories:
@@ -31,7 +31,7 @@ matrix:
     - rust: nightly
   exclude:
     - os: osx
-      env: CARGO_FEATURES="--no-default-features"
+      env: CARGO_FEATURES='--no-default-features'
 
 before_script:
   - pip install 'travis-cargo<0.2' --user && export PATH=`python -m site --user-base`/bin:$PATH
@@ -39,10 +39,13 @@ before_script:
 script:
   - travis-cargo build -- $CARGO_FEATURES
   - travis-cargo test -- $CARGO_FEATURES
+  - rustdoc --test README.md -L target/debug -L target/debug/deps
+  - cargo doc --no-deps
 
 after_success:
   - if [ "$TRAVIS_OS_NAME" == 'linux' ]; then
       travis-cargo coveralls --no-sudo;
+      travis-cargo --only stable doc-upload;
     fi
 
 notifications:
