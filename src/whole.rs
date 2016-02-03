@@ -1,4 +1,4 @@
-//! Process whole files with a single call
+//! Process whole files in a single call.
 //!
 //! Provides functions to compute signatures, delta and patches with a single call. Those functions
 //! are useful if the application prefers to process whole files instead of using fine-grained APIs
@@ -21,17 +21,17 @@ use super::*;
 /// * `block_len`: the block size for signature generation, in bytes;
 /// * `strong_len`: the truncated length of strong checksums, in bytes;
 /// * `sig_type`: the signature format to be used.
-pub fn sig<R, W: ?Sized>(input: R,
-                         output: &mut W,
-                         block_len: usize,
-                         strong_len: usize,
-                         sig_type: SignatureType)
-                         -> Result<u64>
+pub fn signature<R, W: ?Sized>(input: R,
+                               output: &mut W,
+                               block_len: usize,
+                               strong_len: usize,
+                               sig_type: SignatureType)
+                               -> Result<u64>
     where R: Read,
           W: Write
 {
-    let mut signature = try!(Signature::with_options(input, block_len, strong_len, sig_type));
-    let written = try!(io::copy(&mut signature, output));
+    let mut sig = try!(Signature::with_options(input, block_len, strong_len, sig_type));
+    let written = try!(io::copy(&mut sig, output));
     Ok(written)
 }
 
@@ -93,19 +93,19 @@ mod test {
     fn integration() {
         // signature
         let base = Cursor::new(DATA);
-        let mut signature: Vec<u8> = Vec::new();
-        sig(base, &mut signature, 10, 5, SignatureType::Blake2).unwrap();
+        let mut sig = Vec::new();
+        signature(base, &mut sig, 10, 5, SignatureType::Blake2).unwrap();
 
         // delta
-        let sig_in = Cursor::new(signature);
+        let sig_in = Cursor::new(sig);
         let new = Cursor::new(DATA2);
-        let mut dlt: Vec<u8> = Vec::new();
+        let mut dlt = Vec::new();
         delta(new, sig_in, &mut dlt).unwrap();
 
         // patch
         let base = Cursor::new(DATA);
         let dlt = Cursor::new(dlt);
-        let mut out: Vec<u8> = Vec::new();
+        let mut out = Vec::new();
         patch(base, dlt, &mut out).unwrap();
         let out_str = from_utf8(&out).unwrap();
 

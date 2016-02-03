@@ -5,6 +5,9 @@
 
 Rust bindings to [librsync](https://github.com/librsync/librsync).
 
+[API Documentation](http://mbrt.github.io/librsync-rs)
+
+
 ## Introduction
 
 This library contains bindings to librsync[1], to support computation and application of
@@ -107,11 +110,11 @@ fn main() {
     let new = "modified base file".as_bytes();
 
     // signature
-    let mut signature = Vec::new();
-    sig(base, &mut signature, 10, 5, SignatureType::Blake2).unwrap();
+    let mut sig = Vec::new();
+    signature(base, &mut sig, 10, 5, SignatureType::Blake2).unwrap();
 
     // delta
-    let sig_in = Cursor::new(signature);
+    let sig_in = Cursor::new(sig);
     let mut dlt = Vec::new();
     delta(new, sig_in, &mut dlt).unwrap();
 
