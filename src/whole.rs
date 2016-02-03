@@ -30,7 +30,7 @@ pub fn sig<R, W: ?Sized>(input: R,
     where R: Read,
           W: Write
 {
-    let mut signature = try!(Signature::new(input, block_len, strong_len, sig_type));
+    let mut signature = try!(Signature::with_options(input, block_len, strong_len, sig_type));
     let written = try!(io::copy(&mut signature, output));
     Ok(written)
 }

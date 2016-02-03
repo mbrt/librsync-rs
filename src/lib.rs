@@ -28,7 +28,10 @@
 //! # Example: streams
 //!
 //! This example shows how to go trough the streaming APIs, starting from an input string and a
-//! modified string which act as old and new files.
+//! modified string which act as old and new files. The example simulates a real world scenario, in
+//! which the signature of a base file is computed, used as input to compute differencies between
+//! the base file and the new one, and finally the new file is reconstructed, by using the patch
+//! and the base file.
 //!
 //! ```rust
 //! use std::io::prelude::*;
@@ -36,10 +39,10 @@
 //! use librsync::{Delta, Patch, Signature, SignatureType};
 //!
 //! let base = "base file".as_bytes();
-//! let new = "base file (modified)".as_bytes();
+//! let new = "modified base file".as_bytes();
 //!
 //! // create signature starting from base file
-//! let sig = Signature::new(base, 10, 5, SignatureType::Blake2).unwrap();
+//! let sig = Signature::new(base).unwrap();
 //! // create delta from new file and the base signature
 //! let delta = Delta::new(new, sig).unwrap();
 //! // create and store the new file from the base one and the delta
@@ -51,9 +54,45 @@
 //! assert_eq!(computed_new, new);
 //! ```
 //!
-//! Note that intermediate results are not stored anywhere. For example the `Signature` type is
-//! directly used to feed the delta operation. This is possible because of the streaming fashon of
-//! the operations.
+//! Note that intermediate results are not stored in temporary containers. This is possible because
+//! the operations implement the `Read` trait. In this way the results does not need to be fully in
+//! memory, during computation.
+//!
+//!
+//! # Example: whole file API
+//!
+//! This example shows how to go trough the whole file APIs, starting from an input string and a
+//! modified string which act as old and new files. Unlike the streaming example, here we call a
+//! single function, to get the computation result of signature, delta and patch operations. This
+//! is convenient when an output stream (like a network socket or a file) is used as output for an
+//! operation.
+//!
+//! ```rust
+//! use std::io::prelude::*;
+//! use std::io::Cursor;
+//! use librsync::SignatureType;
+//! use librsync::whole::*;
+//!
+//! let base = "base file".as_bytes();
+//! let new = "modified base file".as_bytes();
+//!
+//! // signature
+//! let mut signature = Vec::new();
+//! sig(base, &mut signature, 10, 5, SignatureType::Blake2).unwrap();
+//!
+//! // delta
+//! let sig_in = Cursor::new(signature);
+//! let mut dlt = Vec::new();
+//! delta(new, sig_in, &mut dlt).unwrap();
+//!
+//! // patch
+//! let base = Cursor::new(base);
+//! let dlt = Cursor::new(dlt);
+//! let mut out = Vec::new();
+//! patch(base, dlt, &mut out).unwrap();
+//!
+//! assert_eq!(out, new);
+//! ```
 
 #![deny(missing_copy_implementations,
         trivial_casts, trivial_numeric_casts,
@@ -80,40 +119,67 @@ use job::{Job, JobDriver};
 use std::error;
 use std::fmt::{self, Display, Formatter};
 use std::io::{self, Read, Seek};
-use std::ops::Deref;
 use std::mem;
+use std::ops::Deref;
 use std::ptr;
 use std::slice;
 
 
+/// The signature type.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SignatureType {
+    /// A signature file with MD4 signatures.
+    ///
+    /// Backward compatible with librsync < 1.0, but deprecated because of a security
+    /// vulnerability.
     MD4,
+    /// A signature file using BLAKE2 hash.
     Blake2,
 }
 
+/// Enumeration of all possible errors in this crate.
 #[derive(Debug)]
 pub enum Error {
+    /// An IO error.
     Io(io::Error),
-    Syntax,
+    /// Out of memory.
     Mem,
+    /// Bad magic number at start of stream.
     BadMagic,
+    /// The feature is not available yet.
     Unimplemented,
+    /// Probably a library bug.
     Internal,
+    /// All the other error numbers.
+    ///
+    /// This error should never occur, as it is an indication of a bug.
     Unknown(i32),
 }
 
+/// A `Result` type alias for this crate's `Error` type.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// A struct to generate a signature.
+///
+/// This type takes a `Read` stream for the input from which compute the signatures, and implements
+/// another `Read` stream from which get the result.
 pub struct Signature<R> {
     driver: JobDriver<R>,
 }
 
+/// A struct to generate a delta between two files.
+///
+/// This type takes two `Read` streams, one for the signature of the base file and one for the new
+/// file. It then provides another `Read` stream from which get the result.
 pub struct Delta<R> {
     driver: JobDriver<R>,
     _sumset: Sumset,
 }
 
+/// A struct to apply a delta to a basis file, to recreate the new file.
+///
+/// This type takes a `Read + Seek` stream for the base file, and a `Read` stream for the delta
+/// file. It then provides another `Read` stream from which get the resulting patched file.
 pub struct Patch<'a, R> {
     driver: JobDriver<R>,
     _base: Box<StreamHolder<'a>>,
@@ -130,11 +196,27 @@ impl<T: Read + Seek> ReadAndSeek for T {}
 
 
 impl<R: Read> Signature<R> {
-    pub fn new(input: R,
-               block_len: usize,
-               strong_len: usize,
-               sig_magic: SignatureType)
-               -> Result<Self> {
+    /// Creates a new signature stream with default parameters.
+    ///
+    /// This constructor takes an input stream for the file from which compute the signatures.
+    /// Default options are used for the signature format: BLAKE2 for the hashing, 2048 bytes for
+    /// the block length and full length for the strong signature size.
+    pub fn new(input: R) -> Result<Self> {
+        Self::with_options(input, raw::RS_DEFAULT_BLOCK_LEN, 0, SignatureType::Blake2)
+    }
+
+    /// Creates a new signature stream by specifying custom parameters.
+    ///
+    /// This constructor takes the input stream for the file from which compute the signatures, the
+    /// size of checksum blocks (larger values make the signature shorter and the delta longer). It
+    /// takes the size of strong signatures in bytes. If it is non-zero the signature will be
+    /// truncated to that amount of bytes. The last parameter specifies which version of the
+    /// signature format to be used.
+    pub fn with_options(input: R,
+                        block_len: usize,
+                        strong_len: usize,
+                        sig_magic: SignatureType)
+                        -> Result<Self> {
         logfwd::init();
         let job = unsafe { raw::rs_sig_begin(block_len, strong_len, sig_magic.as_raw()) };
         if job.is_null() {
@@ -143,6 +225,7 @@ impl<R: Read> Signature<R> {
         Ok(Signature { driver: JobDriver::new(input, Job(job)) })
     }
 
+    /// Unwraps this stream, returning the underlying input stream.
     pub fn into_inner(self) -> R {
         self.driver.into_inner()
     }
@@ -156,6 +239,11 @@ impl<R: Read> Read for Signature<R> {
 
 
 impl<R: Read> Delta<R> {
+    /// Creates a new delta stream.
+    ///
+    /// This constructor takes two `Read` streams for the new file (`new` parameter) and for the
+    /// signatures of the base file (`base_sig` parameter). It produces a delta stream from wich
+    /// read the resulting delta file.
     pub fn new<S: Read>(new: R, base_sig: S) -> Result<Self> {
         logfwd::init();
         // load the signature
@@ -182,6 +270,7 @@ impl<R: Read> Delta<R> {
         })
     }
 
+    /// Unwraps this stream, returning the underlying new file stream.
     pub fn into_inner(self) -> R {
         self.driver.into_inner()
     }
@@ -223,7 +312,6 @@ impl error::Error for Error {
     fn description(&self) -> &str {
         match *self {
             Error::Io(ref err) => err.description(),
-            Error::Syntax => "syntax error",
             Error::Mem => "out of memory",
             Error::BadMagic => "bad magic number given",
             Error::Unimplemented => "unimplemented feature",
@@ -254,7 +342,6 @@ impl From<raw::rs_result> for Error {
         match err {
             raw::RS_BLOCKED => io_err(io::ErrorKind::WouldBlock, "blocked waiting for more data"),
             raw::RS_IO_ERROR => io_err(io::ErrorKind::Other, "unknown IO error from librsync"),
-            raw::RS_SYNTAX_ERROR => Error::Syntax,
             raw::RS_MEM_ERROR => Error::Mem,
             raw::RS_INPUT_ENDED => {
                 io_err(io::ErrorKind::UnexpectedEof, "unexpected end of input file")
@@ -360,7 +447,7 @@ mod test {
     #[test]
     fn signature() {
         let cursor = Cursor::new(DATA);
-        let mut sig = Signature::new(cursor, 10, 5, SignatureType::MD4).unwrap();
+        let mut sig = Signature::with_options(cursor, 10, 5, SignatureType::MD4).unwrap();
         let mut signature = Vec::new();
         let read = sig.read_to_end(&mut signature).unwrap();
         assert_eq!(read, signature.len());
@@ -394,7 +481,7 @@ mod test {
     fn integration() {
         let base = Cursor::new(DATA);
         let new = Cursor::new(DATA2);
-        let sig = Signature::new(base, 10, 5, SignatureType::MD4).unwrap();
+        let sig = Signature::with_options(base, 10, 5, SignatureType::MD4).unwrap();
         let delta = Delta::new(new, sig).unwrap();
         let base = Cursor::new(DATA);
         let mut patch = Patch::new(base, delta).unwrap();
