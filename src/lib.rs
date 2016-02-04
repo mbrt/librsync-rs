@@ -42,9 +42,9 @@
 //! let new = "modified base file".as_bytes();
 //!
 //! // create signature starting from base file
-//! let sig = Signature::new(base).unwrap();
+//! let mut sig = Signature::new(base).unwrap();
 //! // create delta from new file and the base signature
-//! let delta = Delta::new(new, sig).unwrap();
+//! let delta = Delta::new(new, &mut sig).unwrap();
 //! // create and store the new file from the base one and the delta
 //! let mut patch = Patch::new(Cursor::new(base), delta).unwrap();
 //! let mut computed_new = Vec::new();
@@ -78,18 +78,15 @@
 //!
 //! // signature
 //! let mut sig = Vec::new();
-//! signature(base, &mut sig, 10, 5, SignatureType::Blake2).unwrap();
+//! signature(&mut Cursor::new(base), &mut sig, 10, 5, SignatureType::Blake2).unwrap();
 //!
 //! // delta
-//! let sig_in = Cursor::new(sig);
 //! let mut dlt = Vec::new();
-//! delta(new, sig_in, &mut dlt).unwrap();
+//! delta(&mut Cursor::new(new), &mut Cursor::new(sig), &mut dlt).unwrap();
 //!
 //! // patch
-//! let base = Cursor::new(base);
-//! let dlt = Cursor::new(dlt);
 //! let mut out = Vec::new();
-//! patch(base, dlt, &mut out).unwrap();
+//! patch(&mut Cursor::new(base), &mut Cursor::new(dlt), &mut out).unwrap();
 //!
 //! assert_eq!(out, new);
 //! ```
@@ -244,7 +241,7 @@ impl<R: Read> Delta<R> {
     /// This constructor takes two `Read` streams for the new file (`new` parameter) and for the
     /// signatures of the base file (`base_sig` parameter). It produces a delta stream from which
     /// read the resulting delta file.
-    pub fn new<S: Read>(new: R, base_sig: S) -> Result<Self> {
+    pub fn new<S: Read + ?Sized>(new: R, base_sig: &mut S) -> Result<Self> {
         logfwd::init();
         // load the signature
         let sumset = unsafe {
@@ -463,9 +460,8 @@ mod test {
     #[test]
     fn delta() {
         let sig = data_signature();
-        let sig = Cursor::new(sig);
         let input = Cursor::new(DATA2);
-        let mut job = Delta::new(input, sig).unwrap();
+        let mut job = Delta::new(input, &mut Cursor::new(sig)).unwrap();
         let mut delta = Vec::new();
         let read = job.read_to_end(&mut delta).unwrap();
         assert_eq!(read, delta.len());
@@ -487,8 +483,8 @@ mod test {
     fn integration() {
         let base = Cursor::new(DATA);
         let new = Cursor::new(DATA2);
-        let sig = Signature::with_options(base, 10, 5, SignatureType::MD4).unwrap();
-        let delta = Delta::new(new, sig).unwrap();
+        let mut sig = Signature::with_options(base, 10, 5, SignatureType::MD4).unwrap();
+        let delta = Delta::new(new, &mut sig).unwrap();
         let base = Cursor::new(DATA);
         let mut patch = Patch::new(base, delta).unwrap();
         let mut computed_new = String::new();
