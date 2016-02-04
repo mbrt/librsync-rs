@@ -71,9 +71,9 @@ fn main() {
     let new = "modified base file".as_bytes();
 
     // create signature starting from base file
-    let sig = Signature::new(base).unwrap();
+    let mut sig = Signature::new(base).unwrap();
     // create delta from new file and the base signature
-    let delta = Delta::new(new, sig).unwrap();
+    let delta = Delta::new(new, &mut sig).unwrap();
     // create and store the new file from the base one and the delta
     let mut patch = Patch::new(Cursor::new(base), delta).unwrap();
     let mut computed_new = Vec::new();
@@ -111,18 +111,15 @@ fn main() {
 
     // signature
     let mut sig = Vec::new();
-    signature(base, &mut sig, 10, 5, SignatureType::Blake2).unwrap();
+    signature(&mut Cursor::new(base), &mut sig, 10, 5, SignatureType::Blake2).unwrap();
 
     // delta
-    let sig_in = Cursor::new(sig);
     let mut dlt = Vec::new();
-    delta(new, sig_in, &mut dlt).unwrap();
+    delta(&mut Cursor::new(new), &mut Cursor::new(sig), &mut dlt).unwrap();
 
     // patch
-    let base = Cursor::new(base);
-    let dlt = Cursor::new(dlt);
     let mut out = Vec::new();
-    patch(base, dlt, &mut out).unwrap();
+    patch(&mut Cursor::new(base), &mut Cursor::new(dlt), &mut out).unwrap();
 
     assert_eq!(out, new);
 }
