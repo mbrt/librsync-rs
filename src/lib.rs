@@ -109,6 +109,7 @@ extern crate log;
 mod macros;
 mod job;
 mod logfwd;
+mod unstrait;
 pub mod whole;
 
 use job::{Job, JobDriver};
@@ -177,15 +178,28 @@ pub struct Delta<R> {
 ///
 /// This type takes a `Read + Seek` stream for the base file, and a `Read` stream for the delta
 /// file. It then provides another `Read` stream from which get the resulting patched file.
-pub struct Patch<'a, R> {
-    driver: JobDriver<R>,
-    _base: Box<StreamHolder<'a>>,
+pub struct Patch<'a, B: 'a, D> {
+    driver: JobDriver<D>,
+    base: Box<B>,
+    _raw: Box<UnsReadAndSeek<'a>>,
 }
 
 
 struct Sumset(*mut raw::rs_signature_t);
 
-struct StreamHolder<'a>(Box<ReadAndSeek + 'a>);
+// Ok, here be dragons. I have two opposed needs for `Patch` struct:
+// * take an input stream preserving its type, to be used by `into_inner`;
+// * provide a `Read + Seek` trait object to `patch_copy_cb`, since C callbacks cannot use generic
+//   parameters.
+//
+// So, what have I done? I box the stream with its concrete type for the first requirement, and I
+// use an unsafe trait object to that type. This pointer can't exist in safe Rust, since its
+// lifetime paramter is not expressible (a struct with a field pointing to another field). I then
+// pass a pointer to that fat pointer to the C callback, which can safely unwrap it and get the
+// needed `Read + Seek` trait. Boxing both fields is important, because moving a `Patch` object
+// will change the addresses of its fields. However their content will not move, since it is on the
+// heap.
+type UnsReadAndSeek<'a> = unstrait::UnsafeTraitObject<ReadAndSeek + 'a>;
 
 // workaround for E0225
 trait ReadAndSeek: Read + Seek {}
@@ -280,31 +294,36 @@ impl<R: Read> Read for Delta<R> {
 }
 
 
-impl<'a, R: Read> Patch<'a, R> {
+impl<'a, B: Read + Seek + 'a, D: Read> Patch<'a, B, D> {
     /// Creates a new patch stream.
     ///
     /// This constructor takes a `Read + Seek` stream for the basis file (`base` parameter), and a
     /// `Read` stream for the delta file (`delta` parameter). It produces a stream from which read
     /// the resulting patched file.
-    pub fn new<B: Read + Seek + 'a>(base: B, delta: R) -> Result<Self> {
+    pub fn new(base: B, delta: D) -> Result<Self> {
         logfwd::init();
 
-        let mut baseh = Box::new(StreamHolder(Box::new(base)));
-        let job = unsafe { raw::rs_patch_begin(patch_copy_cb, baseh.as_raw()) };
+        let base = Box::new(base);
+        let cb_data = Box::new(UnsReadAndSeek::new(&*base));
+        let job = unsafe {
+            let data = mem::transmute(&*cb_data);
+            raw::rs_patch_begin(patch_copy_cb, data)
+        };
         assert!(!job.is_null());
         Ok(Patch {
             driver: JobDriver::new(delta, Job(job)),
-            _base: baseh,
+            base: base,
+            _raw: cb_data,
         })
     }
 
     /// Unwraps this stream and returns the underlying delta stream.
-    pub fn into_delta(self) -> R {
-        self.driver.into_inner()
+    pub fn into_inner(self) -> (B, D) {
+        (*self.base, self.driver.into_inner())
     }
 }
 
-impl<'a, R: Read> Read for Patch<'a, R> {
+impl<'a, B, D: Read> Read for Patch<'a, B, D> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.driver.read(buf)
     }
@@ -388,25 +407,14 @@ impl Deref for Sumset {
 }
 
 
-impl<'a> StreamHolder<'a> {
-    fn as_stream(&mut self) -> &mut ReadAndSeek {
-        &mut *self.0
-    }
-
-    fn as_raw(&mut self) -> *mut libc::c_void {
-        unsafe { mem::transmute(self) }
-    }
-}
-
-
 extern "C" fn patch_copy_cb(opaque: *mut libc::c_void,
                             pos: raw::rs_long_t,
                             len: *mut libc::size_t,
                             buf: *mut *mut libc::c_void)
                             -> raw::rs_result {
     let input = unsafe {
-        let h: *mut StreamHolder = mem::transmute(opaque);
-        (*h).as_stream()
+        let h: *mut UnsReadAndSeek = mem::transmute(opaque);
+        (*h).as_inner_mut()
     };
     let output = unsafe {
         let buf: *mut u8 = mem::transmute(*buf);
