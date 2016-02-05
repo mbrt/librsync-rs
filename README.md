@@ -102,7 +102,6 @@ operation.
 extern crate librsync;
 
 use std::io::Cursor;
-use librsync::SignatureType;
 use librsync::whole::*;
 
 fn main() {

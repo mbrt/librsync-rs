@@ -68,7 +68,6 @@
 //!
 //! ```rust
 //! use std::io::Cursor;
-//! use librsync::SignatureType;
 //! use librsync::whole::*;
 //!
 //! let base = "base file".as_bytes();
