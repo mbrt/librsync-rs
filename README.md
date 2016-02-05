@@ -64,7 +64,7 @@ extern crate librsync;
 
 use std::io::prelude::*;
 use std::io::Cursor;
-use librsync::{Delta, Patch, Signature, SignatureType};
+use librsync::{Delta, Patch, Signature};
 
 fn main() {
     let base = "base file".as_bytes();
@@ -100,7 +100,6 @@ operation.
 ```rust
 extern crate librsync;
 
-use std::io::prelude::*;
 use std::io::Cursor;
 use librsync::SignatureType;
 use librsync::whole::*;

@@ -36,7 +36,7 @@
 //! ```rust
 //! use std::io::prelude::*;
 //! use std::io::Cursor;
-//! use librsync::{Delta, Patch, Signature, SignatureType};
+//! use librsync::{Delta, Patch, Signature};
 //!
 //! let base = "base file".as_bytes();
 //! let new = "modified base file".as_bytes();
@@ -68,7 +68,6 @@
 //! operation.
 //!
 //! ```rust
-//! use std::io::prelude::*;
 //! use std::io::Cursor;
 //! use librsync::SignatureType;
 //! use librsync::whole::*;
