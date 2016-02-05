@@ -16,7 +16,7 @@ pub struct UnsafeTraitObject<T: ?Sized> {
 
 impl<T: ?Sized> UnsafeTraitObject<T> {
     pub fn new(e: &T) -> Self {
-        let mut r = vec![0u8; mem::size_of_val(e)];
+        let mut r = vec![0u8; mem::size_of::<&T>()];
         unsafe {
             let ptr: *mut &T = mem::transmute(r.as_mut_ptr());
             ptr::write(ptr, e);
