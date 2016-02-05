@@ -11,7 +11,7 @@ Rust bindings to [librsync](https://github.com/librsync/librsync).
 
 ## Introduction
 
-This library contains bindings to librsync[1], to support computation and application of
+This library contains bindings to librsync [1], to support computation and application of
 network deltas, used in rsync and duplicity backup applications. This library encapsulates the
 algorithms of the rsync protocol, which computes differences between files efficiently.
 
