@@ -18,19 +18,35 @@ use super::*;
 /// an error is reported.
 ///
 /// The accepted arguments, among the input and output streams, are:
+///
 /// * `block_len`: the block size for signature generation, in bytes;
 /// * `strong_len`: the truncated length of strong checksums, in bytes;
 /// * `sig_type`: the signature format to be used.
-pub fn signature<R: ?Sized, W: ?Sized>(input: &mut R,
-                                       output: &mut W,
-                                       block_len: usize,
-                                       strong_len: usize,
-                                       sig_type: SignatureType)
-                                       -> Result<u64>
+pub fn signature_with_options<R: ?Sized, W: ?Sized>(input: &mut R,
+                                                    output: &mut W,
+                                                    block_len: usize,
+                                                    strong_len: usize,
+                                                    sig_type: SignatureType)
+                                                    -> Result<u64>
     where R: Read,
           W: Write
 {
     let mut sig = try!(Signature::with_options(input, block_len, strong_len, sig_type));
+    let written = try!(io::copy(&mut sig, output));
+    Ok(written)
+}
+
+/// Generates the signature of a basis input, by using default settings.
+///
+/// This function will consume the given input stream and attempt to write the resulting signature
+/// to the given output. In case of success, the number of bytes written is returned, otherwise
+/// an error is reported. Default settings are used to produce the signature. BLAKE2 for the
+/// hashing, 2048 bytes for the block length and full length for the strong signature size.
+pub fn signature<R: ?Sized, W: ?Sized>(input: &mut R, output: &mut W) -> Result<u64>
+    where R: Read,
+          W: Write
+{
+    let mut sig = try!(Signature::new(input));
     let written = try!(io::copy(&mut sig, output));
     Ok(written)
 }
@@ -44,7 +60,7 @@ pub fn signature<R: ?Sized, W: ?Sized>(input: &mut R,
 /// modified file with respect to some base, for which its signature is provided as `base_sig`
 /// parameter.
 ///
-/// To generate a signature, see the `sig` function, or the `Signature` struct.
+/// To generate a signature, see the `signature` function, or the `Signature` struct.
 pub fn delta<R: ?Sized, S: ?Sized, W: ?Sized>(new: &mut R,
                                               base_sig: &mut S,
                                               output: &mut W)
@@ -59,7 +75,7 @@ pub fn delta<R: ?Sized, S: ?Sized, W: ?Sized>(new: &mut R,
 }
 
 
-/// Applies a patch, relative to a basis, into a new file.
+/// Applies a patch, relative to a basis, into an output stream.
 ///
 /// This function will consume the base file and the new file delta inputs and writes to the given
 /// output the patched input. In case of success, the number of bytes written is returned,
@@ -99,7 +115,12 @@ mod test {
     fn integration() {
         // signature
         let mut sig = Vec::new();
-        signature(&mut Cursor::new(DATA), &mut sig, 10, 5, SignatureType::Blake2).unwrap();
+        signature_with_options(&mut Cursor::new(DATA),
+                               &mut sig,
+                               10,
+                               5,
+                               SignatureType::Blake2)
+            .unwrap();
 
         // delta
         let mut dlt = Vec::new();

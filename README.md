@@ -110,7 +110,7 @@ fn main() {
 
     // signature
     let mut sig = Vec::new();
-    signature(&mut Cursor::new(base), &mut sig, 10, 5, SignatureType::Blake2).unwrap();
+    signature(&mut Cursor::new(base), &mut sig).unwrap();
 
     // delta
     let mut dlt = Vec::new();

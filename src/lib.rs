@@ -1,11 +1,10 @@
 //! librsync bindings for Rust.
 //!
-//! This library contains bindings to librsync[1], to support computation and application of
-//! network deltas, used in rsync and duplicity backup applications. This library encapsulates the
-//! algorithms of the rsync protocol, which computes differences between files efficiently.
+//! This library contains bindings to librsync [1], encapsulating the algorithms of the rsync
+//! protocol, which computes differences between files efficiently.
 //!
 //! The rsync protocol, when computes differences, does not require the presence of both files.
-//! It needs instead the new file and a set of checksums of the first file (namely the signature).
+//! It needs instead the new file and a set of checksums of the first file (the signature).
 //! Computed differences can be stored in a delta file. The rsync protocol is then able to
 //! reproduce the new file, by having the old one and the delta.
 //!
@@ -15,13 +14,13 @@
 //! # Overview of types and modules
 //!
 //! This crate provides the streaming operations to produce signatures, delta and patches in the
-//! top-level module, with `Signature`, `Delta` and `Patch` structs. Those structs take some input
+//! top-level module with `Signature`, `Delta` and `Patch` structs. Those structs take some input
 //! stream (`Read` or `Read + Seek` traits) and implement another stream (`Read` trait) from which
 //! the output can be read.
 //!
 //! Higher level operations are provided within the `whole` submodule. If the application does not
-//! need fine-grained control over IO operations, `sig`, `delta` and `patch` submodules can be
-//! used. Those functions apply the algorithms to an output stream (implementing the `Write` trait)
+//! need fine-grained control over IO operations, `signature`, `delta` and `patch` functions can be
+//! used. Those functions apply the results to an output stream (implementing the `Write` trait)
 //! in a single call.
 //!
 //!
@@ -30,8 +29,8 @@
 //! This example shows how to go trough the streaming APIs, starting from an input string and a
 //! modified string which act as old and new files. The example simulates a real world scenario, in
 //! which the signature of a base file is computed, used as input to compute differencies between
-//! the base file and the new one, and finally the new file is reconstructed, by using the patch
-//! and the base file.
+//! the base file and the new one, and finally the new file is reconstructed, by using the base
+//! file and the delta.
 //!
 //! ```rust
 //! use std::io::prelude::*;
@@ -77,7 +76,7 @@
 //!
 //! // signature
 //! let mut sig = Vec::new();
-//! signature(&mut Cursor::new(base), &mut sig, 10, 5, SignatureType::Blake2).unwrap();
+//! signature(&mut Cursor::new(base), &mut sig).unwrap();
 //!
 //! // delta
 //! let mut dlt = Vec::new();
@@ -218,10 +217,10 @@ impl<R: Read> Signature<R> {
     /// Creates a new signature stream by specifying custom parameters.
     ///
     /// This constructor takes the input stream for the file from which compute the signatures, the
-    /// size of checksum blocks (larger values make the signature shorter and the delta longer). It
-    /// takes the size of strong signatures in bytes. If it is non-zero the signature will be
-    /// truncated to that amount of bytes. The last parameter specifies which version of the
-    /// signature format to be used.
+    /// size of checksum blocks as `block_len` parameter (larger values make the signature shorter
+    /// and the delta longer), and the size of strong signatures in bytes as `strong_len`
+    /// parameter. If it is non-zero the signature will be truncated to that amount of bytes.
+    /// The last parameter specifies which version of the signature format to be used.
     pub fn with_options(input: R,
                         block_len: usize,
                         strong_len: usize,
@@ -316,7 +315,7 @@ impl<'a, B: Read + Seek + 'a, D: Read> Patch<'a, B, D> {
         })
     }
 
-    /// Unwraps this stream and returns the underlying delta stream.
+    /// Unwraps this stream and returns the underlying streams.
     pub fn into_inner(self) -> (B, D) {
         (*self.base, self.driver.into_inner())
     }
