@@ -114,7 +114,7 @@ use job::{Job, JobDriver};
 
 use std::error;
 use std::fmt::{self, Display, Formatter};
-use std::io::{self, Read, Seek};
+use std::io::{self, BufReader, Read, Seek};
 use std::mem;
 use std::ops::Deref;
 use std::ptr;
@@ -160,7 +160,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// This type takes a `Read` stream for the input from which compute the signatures, and implements
 /// another `Read` stream from which get the result.
 pub struct Signature<R> {
-    driver: JobDriver<R>,
+    driver: JobDriver<BufReader<R>>,
 }
 
 /// A struct to generate a delta between two files.
@@ -168,7 +168,7 @@ pub struct Signature<R> {
 /// This type takes two `Read` streams, one for the signature of the base file and one for the new
 /// file. It then provides another `Read` stream from which get the result.
 pub struct Delta<R> {
-    driver: JobDriver<R>,
+    driver: JobDriver<BufReader<R>>,
     _sumset: Sumset,
 }
 
@@ -177,7 +177,7 @@ pub struct Delta<R> {
 /// This type takes a `Read + Seek` stream for the base file, and a `Read` stream for the delta
 /// file. It then provides another `Read` stream from which get the resulting patched file.
 pub struct Patch<'a, B: 'a, D> {
-    driver: JobDriver<D>,
+    driver: JobDriver<BufReader<D>>,
     base: Box<B>,
     _raw: Box<UnsReadAndSeek<'a>>,
 }
@@ -226,6 +226,20 @@ impl<R: Read> Signature<R> {
                         strong_len: usize,
                         sig_magic: SignatureType)
                         -> Result<Self> {
+        Self::with_buf_reader(BufReader::new(input), block_len, strong_len, sig_magic)
+    }
+
+    /// Creates a new signature stream by using a `BufReader`.
+    ///
+    /// This constructor takes an already built `BufReader` instance. Prefer this constructor if
+    /// you already have a `BufReader` as input stream, since it avoids wrapping the input stream
+    /// into another `BufReader` instance. See `with_options` constructor for details on the other
+    /// parameters.
+    pub fn with_buf_reader(input: BufReader<R>,
+                           block_len: usize,
+                           strong_len: usize,
+                           sig_magic: SignatureType)
+                           -> Result<Self> {
         logfwd::init();
         let job = unsafe { raw::rs_sig_begin(block_len, strong_len, sig_magic.as_raw()) };
         if job.is_null() {
@@ -236,7 +250,7 @@ impl<R: Read> Signature<R> {
 
     /// Unwraps this stream, returning the underlying input stream.
     pub fn into_inner(self) -> R {
-        self.driver.into_inner()
+        self.driver.into_inner().into_inner()
     }
 }
 
@@ -254,13 +268,23 @@ impl<R: Read> Delta<R> {
     /// signatures of the base file (`base_sig` parameter). It produces a delta stream from which
     /// read the resulting delta file.
     pub fn new<S: Read + ?Sized>(new: R, base_sig: &mut S) -> Result<Self> {
+        Self::with_buf_reader(BufReader::new(new), base_sig)
+    }
+
+    /// Creates a new delta stream by using a `BufReader` as new file.
+    ///
+    /// This constructor specializes the `new` constructor by taking a `BufReader` instance as
+    /// `new` parameter. Prefer this constructor if you already have a `BufReader` as input stream,
+    /// since it avoids wrapping the input stream into another `BufReader` instance. See `new`
+    /// constructor for more details on the parameters.
+    pub fn with_buf_reader<S: Read + ?Sized>(new: BufReader<R>, base_sig: &mut S) -> Result<Self> {
         logfwd::init();
         // load the signature
         let sumset = unsafe {
             let mut sumset = ptr::null_mut();
             let job = raw::rs_loadsig_begin(&mut sumset);
             assert!(!job.is_null());
-            let mut job = JobDriver::new(base_sig, Job(job));
+            let mut job = JobDriver::new(BufReader::new(base_sig), Job(job));
             try!(job.consume_input());
             let sumset = Sumset(sumset);
             let res = raw::rs_build_hash_table(*sumset);
@@ -281,7 +305,7 @@ impl<R: Read> Delta<R> {
 
     /// Unwraps this stream, returning the underlying new file stream.
     pub fn into_inner(self) -> R {
-        self.driver.into_inner()
+        self.driver.into_inner().into_inner()
     }
 }
 
@@ -299,6 +323,16 @@ impl<'a, B: Read + Seek + 'a, D: Read> Patch<'a, B, D> {
     /// `Read` stream for the delta file (`delta` parameter). It produces a stream from which read
     /// the resulting patched file.
     pub fn new(base: B, delta: D) -> Result<Self> {
+        Self::with_buf_reader(base, BufReader::new(delta))
+    }
+
+    /// Creates a new patch stream by using a `BufReader` as delta stream.
+    ///
+    /// This constructor specializes the `new` constructor by taking a `BufReader` instance as
+    /// `delta` parameter. Prefer this constructor if you already have a `BufReader` as input
+    /// stream, since it avoids wrapping the input stream into another `BufReader` instance. See
+    /// `new` constructor for more details on the parameters.
+    pub fn with_buf_reader(base: B, delta: BufReader<D>) -> Result<Self> {
         logfwd::init();
 
         let base = Box::new(base);
@@ -317,7 +351,7 @@ impl<'a, B: Read + Seek + 'a, D: Read> Patch<'a, B, D> {
 
     /// Unwraps this stream and returns the underlying streams.
     pub fn into_inner(self) -> (B, D) {
-        (*self.base, self.driver.into_inner())
+        (*self.base, self.driver.into_inner().into_inner())
     }
 }
 

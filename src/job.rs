@@ -1,4 +1,4 @@
-use std::io::{self, Read};
+use std::io::{self, BufRead, Read};
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::ptr;
@@ -9,9 +9,6 @@ use {Error, raw};
 pub struct JobDriver<R> {
     input: R,
     job: Job,
-    buf: Vec<u8>,
-    pos: usize,
-    cap: usize,
     input_ended: bool,
 }
 
@@ -25,14 +22,11 @@ struct Buffers<'a> {
 }
 
 
-impl<R: Read> JobDriver<R> {
+impl<R: BufRead> JobDriver<R> {
     pub fn new(input: R, job: Job) -> Self {
         JobDriver {
             input: input,
             job: job,
-            buf: vec![0; raw::RS_DEFAULT_BLOCK_LEN],
-            pos: 0,
-            cap: 0,
             input_ended: false,
         }
     }
@@ -46,24 +40,21 @@ impl<R: Read> JobDriver<R> {
     /// If the job needs to write some data, an `ErrorKind::WouldBlock` error is returned.
     pub fn consume_input(&mut self) -> io::Result<()> {
         loop {
-            if self.cap == 0 && !self.input_ended {
-                // need to read some data from input
-                let read = try!(self.input.read(&mut self.buf));
-                if read == 0 {
+            let (res, read, cap) = {
+                let readbuf = try!(self.input.fill_buf());
+                let cap = readbuf.len();
+                if cap == 0 {
                     self.input_ended = true;
                 }
-                self.pos = 0;
-                self.cap = read;
-            }
 
-            // work
-            let mut buffers = Buffers::with_no_out(&self.buf[self.pos..self.pos + self.cap],
-                                                   self.input_ended);
-            let res = unsafe { raw::rs_job_iter(*self.job, buffers.as_raw()) };
-            // update buffer cap and pos
-            let read = self.cap - buffers.available_input();
-            self.pos += read;
-            self.cap -= read;
+                // work
+                let mut buffers = Buffers::with_no_out(readbuf, self.input_ended);
+                let res = unsafe { raw::rs_job_iter(*self.job, buffers.as_raw()) };
+                let read = cap - buffers.available_input();
+                (res, read, cap - read)
+            };
+            // update read size
+            self.input.consume(read);
 
             // determine result
             // NOTE: this should be done here, after the input buffer update, because we need to
@@ -72,7 +63,7 @@ impl<R: Read> JobDriver<R> {
             match res {
                 raw::RS_DONE => (),
                 raw::RS_BLOCKED => {
-                    if self.cap > 0 {
+                    if cap > 0 {
                         // the block is due to a missing output buffer
                         return Err(io::Error::new(io::ErrorKind::WouldBlock,
                                                   "cannot consume input without an output buffer"));
@@ -91,38 +82,34 @@ impl<R: Read> JobDriver<R> {
     }
 }
 
-impl<R: Read> Read for JobDriver<R> {
+impl<R: BufRead> Read for JobDriver<R> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let mut out_pos = 0;
         let mut out_cap = buf.len();
 
         loop {
-            if self.cap == 0 && !self.input_ended {
-                // need to read some data from input
-                let read = try!(self.input.read(&mut self.buf));
-                if read == 0 {
+            let (read, written) = {
+                let readbuf = try!(self.input.fill_buf());
+                let cap = readbuf.len();
+                if cap == 0 {
                     self.input_ended = true;
                 }
-                self.pos = 0;
-                self.cap = read;
-            }
 
-            // work
-            let mut buffers = Buffers::new(&self.buf[self.pos..self.pos + self.cap],
-                                           &mut buf[out_pos..],
-                                           self.input_ended);
-            let res = unsafe { raw::rs_job_iter(*self.job, buffers.as_raw()) };
-            if res != raw::RS_DONE && res != raw::RS_BLOCKED {
-                let err = Error::from(res);
-                return Err(io::Error::new(io::ErrorKind::Other, err));
-            }
+                // work
+                let mut buffers = Buffers::new(readbuf, &mut buf[out_pos..], self.input_ended);
+                let res = unsafe { raw::rs_job_iter(*self.job, buffers.as_raw()) };
+                if res != raw::RS_DONE && res != raw::RS_BLOCKED {
+                    let err = Error::from(res);
+                    return Err(io::Error::new(io::ErrorKind::Other, err));
+                }
+                let read = cap - buffers.available_input();
+                let written = out_cap - buffers.available_output();
+                (read, written)
+            };
 
-            // update buffer cap and pos
-            let read = self.cap - buffers.available_input();
-            self.pos += read;
-            self.cap -= read;
-            // determine written
-            let written = out_cap - buffers.available_output();
+            // update read size
+            self.input.consume(read);
+            // update write size
             out_pos += written;
             out_cap -= written;
             if out_cap == 0 || written == 0 {
