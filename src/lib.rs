@@ -361,6 +361,11 @@ impl<'a, B, D: Read> Read for Patch<'a, B, D> {
     }
 }
 
+unsafe impl<'a, B: 'a, D> Send for Patch<'a, B, D>
+    where B: Send,
+          D: Send
+{}
+
 
 impl error::Error for Error {
     fn description(&self) -> &str {
@@ -438,6 +443,8 @@ impl Deref for Sumset {
     }
 }
 
+unsafe impl Send for Sumset {}
+
 
 extern "C" fn patch_copy_cb(opaque: *mut libc::c_void,
                             pos: raw::rs_long_t,
@@ -469,6 +476,7 @@ fn io_err<E>(kind: io::ErrorKind, e: E) -> Error
 mod test {
     use super::*;
     use std::io::{Cursor, Read};
+    use std::thread;
 
     const DATA: &'static str = "this is a string to be tested";
     const DATA2: &'static str = "this is another string to be tested";
@@ -530,5 +538,41 @@ mod test {
         let mut computed_new = String::new();
         patch.read_to_string(&mut computed_new).unwrap();
         assert_eq!(computed_new, DATA2);
+    }
+
+    #[test]
+    fn send_sig() {
+        let cursor = Cursor::new(DATA);
+        let mut sig = Signature::new(cursor).unwrap();
+        let t = thread::spawn(move || {
+            let mut signature = Vec::new();
+            sig.read_to_end(&mut signature).unwrap();
+        });
+        t.join().unwrap();
+    }
+
+    #[test]
+    fn send_delta() {
+        let sig = data_signature();
+        let input = Cursor::new(DATA2);
+        let mut job = Delta::new(input, &mut Cursor::new(sig)).unwrap();
+        let t = thread::spawn(move || {
+            let mut delta = Vec::new();
+            job.read_to_end(&mut delta).unwrap();
+        });
+        t.join().unwrap();
+    }
+
+    #[test]
+    fn send_patch() {
+        let base = Cursor::new(DATA);
+        let delta = data2_delta();
+        let delta = Cursor::new(delta);
+        let mut patch = Patch::new(base, delta).unwrap();
+        let t = thread::spawn(move || {
+            let mut computed_new = String::new();
+            patch.read_to_string(&mut computed_new).unwrap();
+        });
+        t.join().unwrap();
     }
 }

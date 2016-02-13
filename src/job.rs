@@ -119,6 +119,8 @@ impl<R: BufRead> Read for JobDriver<R> {
     }
 }
 
+unsafe impl Send for Job {}
+
 
 impl Deref for Job {
     type Target = *mut raw::rs_job_t;
