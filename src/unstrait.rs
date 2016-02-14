@@ -43,5 +43,5 @@ impl<T: ?Sized> UnsafeTraitObject<T> {
     }
 }
 
-unsafe impl<'a, T: ?Sized + 'a> Send for UnsafeTraitObject<T> where &'a T: Sync
+unsafe impl<'a, T: ?Sized + 'a> Send for UnsafeTraitObject<T> where &'a T: Send
 {}
