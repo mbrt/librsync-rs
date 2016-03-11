@@ -231,11 +231,11 @@ impl<R: Read> Signature<BufReader<R>> {
 }
 
 impl<R: BufRead> Signature<R> {
-    /// Creates a new signature stream by using a `BufReader`.
+    /// Creates a new signature stream by using a `BufRead`.
     ///
-    /// This constructor takes an already built `BufReader` instance. Prefer this constructor if
-    /// you already have a `BufReader` as input stream, since it avoids wrapping the input stream
-    /// into another `BufReader` instance. See `with_options` constructor for details on the other
+    /// This constructor takes an already built `BufRead` instance. Prefer this constructor if
+    /// you already have a `BufRead` as input stream, since it avoids wrapping the input stream
+    /// into another `BufRead` instance. See `with_options` constructor for details on the other
     /// parameters.
     pub fn with_buf_read(input: R,
                          block_len: usize,
@@ -275,11 +275,11 @@ impl<R: Read> Delta<BufReader<R>> {
 }
 
 impl<R: BufRead> Delta<R> {
-    /// Creates a new delta stream by using a `BufReader` as new file.
+    /// Creates a new delta stream by using a `BufRead` as new file.
     ///
-    /// This constructor specializes the `new` constructor by taking a `BufReader` instance as
-    /// `new` parameter. Prefer this constructor if you already have a `BufReader` as input stream,
-    /// since it avoids wrapping the input stream into another `BufReader` instance. See `new`
+    /// This constructor specializes the `new` constructor by taking a `BufRead` instance as
+    /// `new` parameter. Prefer this constructor if you already have a `BufRead` as input stream,
+    /// since it avoids wrapping the input stream into another `BufRead` instance. See `new`
     /// constructor for more details on the parameters.
     pub fn with_buf_read<S: Read + ?Sized>(new: R, base_sig: &mut S) -> Result<Self> {
         logfwd::init();
@@ -332,11 +332,11 @@ impl<'a, B: Read + Seek + 'a, D: Read> Patch<'a, B, BufReader<D>> {
 }
 
 impl<'a, B: Read + Seek + 'a, D: BufRead> Patch<'a, B, D> {
-    /// Creates a new patch stream by using a `BufReader` as delta stream.
+    /// Creates a new patch stream by using a `BufRead` as delta stream.
     ///
-    /// This constructor specializes the `new` constructor by taking a `BufReader` instance as
-    /// `delta` parameter. Prefer this constructor if you already have a `BufReader` as input
-    /// stream, since it avoids wrapping the input stream into another `BufReader` instance. See
+    /// This constructor specializes the `new` constructor by taking a `BufRead` instance as
+    /// `delta` parameter. Prefer this constructor if you already have a `BufRead` as input
+    /// stream, since it avoids wrapping the input stream into another `BufRead` instance. See
     /// `new` constructor for more details on the parameters.
     pub fn with_buf_read(base: B, delta: D) -> Result<Self> {
         logfwd::init();
