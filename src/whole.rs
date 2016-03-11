@@ -7,7 +7,7 @@
 //! If fine-grained control over IO is necessary, it is provided by `Signature`, `Delta` and
 //! `Patch` structs.
 
-use std::io::{self, Read, Seek, Write};
+use std::io::{self, BufRead, Read, Seek, Write};
 use super::*;
 
 
@@ -28,7 +28,7 @@ pub fn signature_with_options<R: ?Sized, W: ?Sized>(input: &mut R,
                                                     strong_len: usize,
                                                     sig_type: SignatureType)
                                                     -> Result<u64>
-    where R: Read,
+    where R: BufRead,
           W: Write
 {
     let mut sig = try!(Signature::with_options(input, block_len, strong_len, sig_type));
@@ -51,7 +51,6 @@ pub fn signature<R: ?Sized, W: ?Sized>(input: &mut R, output: &mut W) -> Result<
     Ok(written)
 }
 
-
 /// Generates a delta between a signature and a new file streams.
 ///
 /// This function will consume the new file and base signature inputs and writes to the given
@@ -73,7 +72,6 @@ pub fn delta<R: ?Sized, S: ?Sized, W: ?Sized>(new: &mut R,
     let written = try!(io::copy(&mut delta, output));
     Ok(written)
 }
-
 
 /// Applies a patch, relative to a basis, into an output stream.
 ///
