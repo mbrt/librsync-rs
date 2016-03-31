@@ -111,6 +111,7 @@ pub mod whole;
 
 use job::{Job, JobDriver};
 
+use std::cell::{RefCell, RefMut};
 use std::error;
 use std::fmt::{self, Display, Formatter};
 use std::io::{self, BufRead, BufReader, Read, Seek};
@@ -178,8 +179,8 @@ pub struct Delta<R> {
 /// file. It then provides another `Read` stream from which get the resulting patched file.
 pub struct Patch<'a, B: 'a, D> {
     driver: JobDriver<D>,
-    base: Rc<B>,
-    _raw: Box<Rc<ReadAndSeek + 'a>>,
+    base: Rc<RefCell<B>>,
+    _raw: Box<Rc<RefCell<ReadAndSeek + 'a>>>,
 }
 
 
@@ -329,10 +330,10 @@ impl<'a, B: Read + Seek + 'a, D: BufRead> Patch<'a, B, D> {
     pub fn with_buf_read(base: B, delta: D) -> Result<Self> {
         logfwd::init();
 
-        let base = Rc::new(base);
-        let cb_data: Box<Rc<ReadAndSeek>> = Box::new(base.clone());
+        let base = Rc::new(RefCell::new(base));
+        let cb_data: Box<Rc<RefCell<ReadAndSeek>>> = Box::new(base.clone());
         let job = unsafe {
-            let data: &Rc<ReadAndSeek> = &*cb_data;
+            let data: &Rc<RefCell<ReadAndSeek>> = &*cb_data;
             let data = mem::transmute(data);
             raw::rs_patch_begin(patch_copy_cb, data)
         };
@@ -356,7 +357,7 @@ impl<'a, B: Read + Seek + 'a, D: BufRead> Patch<'a, B, D> {
                 _ => unreachable!(),
             }
         };
-        (base, self.driver.into_inner())
+        (base.into_inner(), self.driver.into_inner())
     }
 }
 
@@ -457,9 +458,9 @@ extern "C" fn patch_copy_cb(opaque: *mut libc::c_void,
                             len: *mut libc::size_t,
                             buf: *mut *mut libc::c_void)
                             -> raw::rs_result {
-    let input: &mut ReadAndSeek = unsafe {
-        let h: *mut Rc<ReadAndSeek> = mem::transmute(opaque);
-        Rc::get_mut(&mut *h).unwrap()
+    let mut input: RefMut<ReadAndSeek> = unsafe {
+        let h: *mut Rc<RefCell<ReadAndSeek>> = mem::transmute(opaque);
+        (*h).borrow_mut()
     };
     let output = unsafe {
         let buf: *mut u8 = mem::transmute(*buf);
