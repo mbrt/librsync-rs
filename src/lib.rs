@@ -332,11 +332,7 @@ impl<'a, B: Read + Seek + 'a, D: BufRead> Patch<'a, B, D> {
 
         let base = Rc::new(RefCell::new(base));
         let cb_data: Box<Rc<RefCell<ReadAndSeek>>> = Box::new(base.clone());
-        let job = unsafe {
-            let data: &Rc<RefCell<ReadAndSeek>> = &*cb_data;
-            let data = mem::transmute(data);
-            raw::rs_patch_begin(patch_copy_cb, data)
-        };
+        let job = unsafe { raw::rs_patch_begin(patch_copy_cb, mem::transmute(&*cb_data)) };
         assert!(!job.is_null());
         Ok(Patch {
             driver: JobDriver::new(delta, Job(job)),
@@ -351,11 +347,9 @@ impl<'a, B: Read + Seek + 'a, D: BufRead> Patch<'a, B, D> {
         {
             let _drop = self._raw;
         }
-        let base = {
-            match Rc::try_unwrap(self.base) {
-                Ok(base) => base,
-                _ => unreachable!(),
-            }
+        let base = match Rc::try_unwrap(self.base) {
+            Ok(base) => base,
+            _ => unreachable!(),
         };
         (base.into_inner(), self.driver.into_inner())
     }
