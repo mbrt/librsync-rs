@@ -180,7 +180,7 @@ pub struct Delta<R> {
 pub struct Patch<'a, B: 'a, D> {
     driver: JobDriver<D>,
     base: Rc<RefCell<B>>,
-    _raw: Box<Rc<RefCell<ReadAndSeek + 'a>>>,
+    raw: Box<Rc<RefCell<ReadAndSeek + 'a>>>,
 }
 
 
@@ -337,7 +337,7 @@ impl<'a, B: Read + Seek + 'a, D: BufRead> Patch<'a, B, D> {
         Ok(Patch {
             driver: JobDriver::new(delta, Job(job)),
             base: base,
-            _raw: cb_data,
+            raw: cb_data,
         })
     }
 
@@ -345,7 +345,7 @@ impl<'a, B: Read + Seek + 'a, D: BufRead> Patch<'a, B, D> {
     pub fn into_inner(self) -> (B, D) {
         // drop the secondary Rc before unwrapping the other
         {
-            let _drop = self._raw;
+            let _drop = self.raw;
         }
         let base = match Rc::try_unwrap(self.base) {
             Ok(base) => base,
@@ -504,6 +504,7 @@ mod test {
         let read = sig.read_to_end(&mut signature).unwrap();
         assert_eq!(read, signature.len());
         assert_eq!(signature, data_signature());
+        sig.into_inner();
     }
 
     #[test]
@@ -515,6 +516,7 @@ mod test {
         let read = job.read_to_end(&mut delta).unwrap();
         assert_eq!(read, delta.len());
         assert_eq!(delta, data2_delta());
+        job.into_inner();
     }
 
     #[test]
@@ -526,6 +528,7 @@ mod test {
         let mut computed_new = String::new();
         patch.read_to_string(&mut computed_new).unwrap();
         assert_eq!(computed_new, DATA2);
+        patch.into_inner();
     }
 
     #[test]
