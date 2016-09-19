@@ -29,7 +29,7 @@ Simply add a corresponding entry to your `Cargo.toml` dependency list:
 
 ```toml
 [dependencies]
-librsync = "0.1"
+librsync = "0.2"
 ```
 
 And add this to your crate root:
