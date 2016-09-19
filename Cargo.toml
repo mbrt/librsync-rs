@@ -7,6 +7,7 @@ readme = "README.md"
 keywords = ["librsync", "rsync", "backup"]
 repository = "https://github.com/mbrt/librsync-rs"
 homepage = "https://github.com/mbrt/librsync-rs"
+documentation = "https://docs.rs/librsync"
 description = """
 Bindings to librsync for calculating and applying network
 deltas exposed as Reader/Writer streams.

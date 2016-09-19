@@ -6,7 +6,7 @@
 
 Rust bindings to [librsync](https://github.com/librsync/librsync).
 
-[API Documentation](http://mbrt.github.io/librsync-rs)
+[API Documentation](https://docs.rs/librsync)
 
 
 ## Introduction
