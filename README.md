@@ -54,9 +54,9 @@ in a single call.
 
 ## Example: streams
 
-This example shows how to go trough the streaming APIs, starting from an input string and a
+This example shows how to go through the streaming APIs, starting from an input string and a
 modified string which act as old and new files. The example simulates a real world scenario, in
-which the signature of a base file is computed, used as input to compute differencies between
+which the signature of a base file is computed, used as input to compute differences between
 the base file and the new one, and finally the new file is reconstructed, by using the patch
 and the base file.
 
