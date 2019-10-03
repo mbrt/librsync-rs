@@ -579,4 +579,14 @@ mod test {
         });
         t.join().unwrap();
     }
+
+    #[test]
+    fn trivial_large_file() {
+        let data = vec![0; 65536];
+        let mut sig = Signature::with_options(Cursor::new(&data), 16384, 5, SignatureType::MD4).unwrap();
+        let delta = Delta::new(Cursor::new(&data), &mut sig).unwrap();
+        let mut computed_new = vec![];
+        Patch::new(Cursor::new(&data), delta).unwrap().read_to_end(&mut computed_new).unwrap();
+        assert_eq!(computed_new, data);
+    }
 }
