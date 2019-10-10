@@ -88,7 +88,7 @@ impl<R: BufRead> Read for JobDriver<R> {
         let mut out_cap = buf.len();
 
         loop {
-            let (read, written) = {
+            let (res, read, written) = {
                 let readbuf = try!(self.input.fill_buf());
                 let cap = readbuf.len();
                 if cap == 0 {
@@ -104,7 +104,7 @@ impl<R: BufRead> Read for JobDriver<R> {
                 }
                 let read = cap - buffers.available_input();
                 let written = out_cap - buffers.available_output();
-                (read, written)
+                (res, read, written)
             };
 
             // update read size
@@ -112,7 +112,7 @@ impl<R: BufRead> Read for JobDriver<R> {
             // update write size
             out_pos += written;
             out_cap -= written;
-            if out_cap == 0 || written == 0 {
+            if out_cap == 0 || res == raw::RS_DONE {
                 return Ok(out_pos);
             }
         }
