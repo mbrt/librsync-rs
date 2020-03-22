@@ -7,9 +7,8 @@
 //! If fine-grained control over IO is necessary, it is provided by `Signature`, `Delta` and
 //! `Patch` structs.
 
-use std::io::{self, BufRead, Read, Seek, Write};
 use super::*;
-
+use std::io::{self, BufRead, Read, Seek, Write};
 
 /// Generates the signature of a basis input, and writes it out to an output stream.
 ///
@@ -22,16 +21,20 @@ use super::*;
 /// * `block_len`: the block size for signature generation, in bytes;
 /// * `strong_len`: the truncated length of strong checksums, in bytes;
 /// * `sig_type`: the signature format to be used.
-pub fn signature_with_options<R: ?Sized, W: ?Sized>(input: &mut R,
-                                                    output: &mut W,
-                                                    block_len: usize,
-                                                    strong_len: usize,
-                                                    sig_type: SignatureType)
-                                                    -> Result<u64>
-    where R: BufRead,
-          W: Write
+pub fn signature_with_options<R: ?Sized, W: ?Sized>(
+    input: &mut R,
+    output: &mut W,
+    block_len: usize,
+    strong_len: usize,
+    sig_type: SignatureType,
+) -> Result<u64>
+where
+    R: BufRead,
+    W: Write,
 {
-    let mut sig = try!(Signature::with_options(input, block_len, strong_len, sig_type));
+    let mut sig = try!(Signature::with_options(
+        input, block_len, strong_len, sig_type
+    ));
     let written = try!(io::copy(&mut sig, output));
     Ok(written)
 }
@@ -43,8 +46,9 @@ pub fn signature_with_options<R: ?Sized, W: ?Sized>(input: &mut R,
 /// an error is reported. Default settings are used to produce the signature. BLAKE2 for the
 /// hashing, 2048 bytes for the block length and full length for the strong signature size.
 pub fn signature<R: ?Sized, W: ?Sized>(input: &mut R, output: &mut W) -> Result<u64>
-    where R: Read,
-          W: Write
+where
+    R: Read,
+    W: Write,
 {
     let mut sig = try!(Signature::new(input));
     let written = try!(io::copy(&mut sig, output));
@@ -60,13 +64,15 @@ pub fn signature<R: ?Sized, W: ?Sized>(input: &mut R, output: &mut W) -> Result<
 /// parameter.
 ///
 /// To generate a signature, see the `signature` function, or the `Signature` struct.
-pub fn delta<R: ?Sized, S: ?Sized, W: ?Sized>(new: &mut R,
-                                              base_sig: &mut S,
-                                              output: &mut W)
-                                              -> Result<u64>
-    where R: Read,
-          S: Read,
-          W: Write
+pub fn delta<R: ?Sized, S: ?Sized, W: ?Sized>(
+    new: &mut R,
+    base_sig: &mut S,
+    output: &mut W,
+) -> Result<u64>
+where
+    R: Read,
+    S: Read,
+    W: Write,
 {
     let mut delta = try!(Delta::new(new, base_sig));
     let written = try!(io::copy(&mut delta, output));
@@ -83,19 +89,20 @@ pub fn delta<R: ?Sized, S: ?Sized, W: ?Sized>(new: &mut R,
 /// be used to write the output.
 ///
 /// To generate a delta, see the `delta` function, or the `Delta` struct.
-pub fn patch<B: ?Sized, D: ?Sized, W: ?Sized>(base: &mut B,
-                                              delta: &mut D,
-                                              output: &mut W)
-                                              -> Result<u64>
-    where B: Read + Seek,
-          D: Read,
-          W: Write
+pub fn patch<B: ?Sized, D: ?Sized, W: ?Sized>(
+    base: &mut B,
+    delta: &mut D,
+    output: &mut W,
+) -> Result<u64>
+where
+    B: Read + Seek,
+    D: Read,
+    W: Write,
 {
     let mut patch = try!(Patch::new(base, delta));
     let written = try!(io::copy(&mut patch, output));
     Ok(written)
 }
-
 
 #[cfg(test)]
 mod test {
@@ -108,17 +115,18 @@ mod test {
     const DATA: &'static str = "this is a string to be tested";
     const DATA2: &'static str = "this is another string to be tested";
 
-
     #[test]
     fn integration() {
         // signature
         let mut sig = Vec::new();
-        signature_with_options(&mut Cursor::new(DATA),
-                               &mut sig,
-                               10,
-                               5,
-                               SignatureType::Blake2)
-            .unwrap();
+        signature_with_options(
+            &mut Cursor::new(DATA),
+            &mut sig,
+            10,
+            5,
+            SignatureType::Blake2,
+        )
+        .unwrap();
 
         // delta
         let mut dlt = Vec::new();
