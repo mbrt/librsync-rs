@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::ptr;
 
-use {raw, Error};
+use crate::{raw, Error};
 
 pub struct JobDriver<R> {
     input: R,
@@ -38,7 +38,7 @@ impl<R: BufRead> JobDriver<R> {
     pub fn consume_input(&mut self) -> io::Result<()> {
         loop {
             let (res, read, cap) = {
-                let readbuf = try!(self.input.fill_buf());
+                let readbuf = self.input.fill_buf()?;
                 let cap = readbuf.len();
                 if cap == 0 {
                     self.input_ended = true;
@@ -88,7 +88,7 @@ impl<R: BufRead> Read for JobDriver<R> {
 
         loop {
             let (res, read, written) = {
-                let readbuf = try!(self.input.fill_buf());
+                let readbuf = self.input.fill_buf()?;
                 let cap = readbuf.len();
                 if cap == 0 {
                     self.input_ended = true;

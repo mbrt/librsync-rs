@@ -32,10 +32,10 @@ where
     R: BufRead,
     W: Write,
 {
-    let mut sig = try!(Signature::with_options(
+    let mut sig = Signature::with_options(
         input, block_len, strong_len, sig_type
-    ));
-    let written = try!(io::copy(&mut sig, output));
+    )?;
+    let written = io::copy(&mut sig, output)?;
     Ok(written)
 }
 
@@ -50,8 +50,8 @@ where
     R: Read,
     W: Write,
 {
-    let mut sig = try!(Signature::new(input));
-    let written = try!(io::copy(&mut sig, output));
+    let mut sig = Signature::new(input)?;
+    let written = io::copy(&mut sig, output)?;
     Ok(written)
 }
 
@@ -74,8 +74,8 @@ where
     S: Read,
     W: Write,
 {
-    let mut delta = try!(Delta::new(new, base_sig));
-    let written = try!(io::copy(&mut delta, output));
+    let mut delta = Delta::new(new, base_sig)?;
+    let written = io::copy(&mut delta, output)?;
     Ok(written)
 }
 
@@ -99,15 +99,15 @@ where
     D: Read,
     W: Write,
 {
-    let mut patch = try!(Patch::new(base, delta));
-    let written = try!(io::copy(&mut patch, output));
+    let mut patch = Patch::new(base, delta)?;
+    let written = io::copy(&mut patch, output)?;
     Ok(written)
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use SignatureType;
+    use crate::SignatureType;
 
     use std::io::Cursor;
     use std::str::from_utf8;
