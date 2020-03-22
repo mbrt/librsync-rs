@@ -22,8 +22,8 @@ struct Buffers<'a> {
 impl<R: BufRead> JobDriver<R> {
     pub fn new(input: R, job: Job) -> Self {
         JobDriver {
-            input: input,
-            job: job,
+            input,
+            job,
             input_ended: false,
         }
     }

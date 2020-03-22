@@ -341,7 +341,7 @@ impl<'a, B: Read + Seek + 'a, D: BufRead> Patch<'a, B, D> {
         assert!(!job.is_null());
         Ok(Patch {
             driver: JobDriver::new(delta, Job(job)),
-            base: base,
+            base,
             raw: cb_data,
         })
     }
@@ -414,8 +414,8 @@ impl From<raw::rs_result> for Error {
 }
 
 impl SignatureType {
-    fn as_raw(&self) -> raw::rs_magic_number {
-        match *self {
+    fn as_raw(self) -> raw::rs_magic_number {
+        match self {
             SignatureType::MD4 => raw::RS_MD4_SIG_MAGIC,
             SignatureType::Blake2 => raw::RS_BLAKE2_SIG_MAGIC,
         }
@@ -488,8 +488,8 @@ mod test {
     // generated with `rdiff delta data.sig data2 data2.delta`
     fn data2_delta() -> Vec<u8> {
         vec![
-            0x72, 0x73, 0x02, 0x36, 0x41, 0x10, 0x74, 0x68, 0x69, 0x73, 0x20, 0x69, 0x73, 0x20,
-            0x61, 0x6e, 0x6f, 0x74, 0x68, 0x65, 0x72, 0x20, 0x45, 0x0a, 0x13, 0x00,
+            0x72, 0x73, 0x02, 0x36, 0x10, 0x74, 0x68, 0x69, 0x73, 0x20, 0x69, 0x73, 0x20, 0x61,
+            0x6e, 0x6f, 0x74, 0x68, 0x65, 0x72, 0x20, 0x45, 0x0a, 0x13, 0x00,
         ]
     }
 
@@ -580,10 +580,14 @@ mod test {
     #[test]
     fn trivial_large_file() {
         let data = vec![0; 65536];
-        let mut sig = Signature::with_options(Cursor::new(&data), 16384, 5, SignatureType::MD4).unwrap();
+        let mut sig =
+            Signature::with_options(Cursor::new(&data), 16384, 5, SignatureType::MD4).unwrap();
         let delta = Delta::new(Cursor::new(&data), &mut sig).unwrap();
         let mut computed_new = vec![];
-        Patch::new(Cursor::new(&data), delta).unwrap().read_to_end(&mut computed_new).unwrap();
+        Patch::new(Cursor::new(&data), delta)
+            .unwrap()
+            .read_to_end(&mut computed_new)
+            .unwrap();
         assert_eq!(computed_new, data);
     }
 }

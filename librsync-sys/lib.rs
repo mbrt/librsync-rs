@@ -4,9 +4,9 @@ extern crate libc;
 use libc::*;
 
 pub type rs_magic_number = c_int;
-pub const RS_DELTA_MAGIC: c_int = 0x72730236;
-pub const RS_MD4_SIG_MAGIC: c_int = 0x72730136;
-pub const RS_BLAKE2_SIG_MAGIC: c_int = 0x72730137;
+pub const RS_DELTA_MAGIC: c_int = 0x7273_0236;
+pub const RS_MD4_SIG_MAGIC: c_int = 0x7273_0136;
+pub const RS_BLAKE2_SIG_MAGIC: c_int = 0x7273_0137;
 
 pub type rs_result = c_int;
 pub const RS_DONE: c_int = 0;
@@ -49,22 +49,23 @@ pub struct rs_buffers_t {
     pub avail_out: size_t,
 }
 
-pub type rs_copy_cb = extern "C" fn(opaque: *mut c_void,
-                                    pos: rs_long_t,
-                                    len: *mut size_t,
-                                    buf: *mut *mut c_void)
-                                    -> rs_result;
+pub type rs_copy_cb = extern "C" fn(
+    opaque: *mut c_void,
+    pos: rs_long_t,
+    len: *mut size_t,
+    buf: *mut *mut c_void,
+) -> rs_result;
 pub type rs_trace_fn_t = extern "C" fn(level: rs_loglevel, msg: *const c_char);
-
 
 extern "C" {
     pub fn rs_job_iter(job: *mut rs_job_t, buffers: *mut rs_buffers_t) -> rs_result;
     pub fn rs_job_free(job: *mut rs_job_t) -> rs_result;
 
-    pub fn rs_sig_begin(new_block_len: size_t,
-                        strong_sum_len: size_t,
-                        sig_magic: rs_magic_number)
-                        -> *mut rs_job_t;
+    pub fn rs_sig_begin(
+        new_block_len: size_t,
+        strong_sum_len: size_t,
+        sig_magic: rs_magic_number,
+    ) -> *mut rs_job_t;
     pub fn rs_delta_begin(sig: *mut rs_signature_t) -> *mut rs_job_t;
     pub fn rs_loadsig_begin(sig: *mut *mut rs_signature_t) -> *mut rs_job_t;
     pub fn rs_build_hash_table(sums: *mut rs_signature_t) -> rs_result;

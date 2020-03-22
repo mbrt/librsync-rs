@@ -32,9 +32,7 @@ where
     R: BufRead,
     W: Write,
 {
-    let mut sig = Signature::with_options(
-        input, block_len, strong_len, sig_type
-    )?;
+    let mut sig = Signature::with_options(input, block_len, strong_len, sig_type)?;
     let written = io::copy(&mut sig, output)?;
     Ok(written)
 }
