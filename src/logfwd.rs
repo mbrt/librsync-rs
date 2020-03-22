@@ -1,8 +1,7 @@
-use std::sync::{ONCE_INIT, Once};
 use libc::c_char;
+use std::sync::{Once, ONCE_INIT};
 
 use raw;
-
 
 /// Manually initialize logging.
 ///
@@ -16,7 +15,6 @@ pub fn init() {
         });
     }
 }
-
 
 #[cfg(feature = "log")]
 fn init_impl() {
@@ -42,8 +40,8 @@ fn init_impl() {
 
 #[cfg(feature = "log")]
 extern "C" fn trace(level: raw::rs_loglevel, msg: *const c_char) {
-    use std::ffi::CStr;
     use log::LogLevel;
+    use std::ffi::CStr;
 
     let level = match level {
         raw::RS_LOG_EMERG | raw::RS_LOG_ALERT | raw::RS_LOG_CRIT | raw::RS_LOG_ERR => {
@@ -57,7 +55,6 @@ extern "C" fn trace(level: raw::rs_loglevel, msg: *const c_char) {
     let msg = unsafe { CStr::from_ptr(msg).to_string_lossy() };
     log!(target: "librsync", level, "{}", msg);
 }
-
 
 #[cfg(not(feature = "log"))]
 fn init_impl() {
