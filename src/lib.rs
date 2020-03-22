@@ -112,7 +112,7 @@ mod logfwd;
 mod macros;
 pub mod whole;
 
-use job::{Job, JobDriver};
+use crate::job::{Job, JobDriver};
 
 use std::cell::{RefCell, RefMut};
 use std::error;
@@ -182,7 +182,7 @@ pub struct Delta<R> {
 pub struct Patch<'a, B: 'a, D> {
     driver: JobDriver<D>,
     base: Rc<RefCell<B>>,
-    raw: Box<Rc<RefCell<ReadAndSeek + 'a>>>,
+    raw: Box<Rc<RefCell<dyn ReadAndSeek + 'a>>>,
 }
 
 struct Sumset(*mut raw::rs_signature_t);
@@ -281,7 +281,7 @@ impl<R: BufRead> Delta<R> {
             let job = raw::rs_loadsig_begin(&mut sumset);
             assert!(!job.is_null());
             let mut job = JobDriver::new(BufReader::new(base_sig), Job(job));
-            try!(job.consume_input());
+            job.consume_input()?;
             let sumset = Sumset(sumset);
             let res = raw::rs_build_hash_table(*sumset);
             if res != raw::RS_DONE {
@@ -336,7 +336,7 @@ impl<'a, B: Read + Seek + 'a, D: BufRead> Patch<'a, B, D> {
         logfwd::init();
 
         let base = Rc::new(RefCell::new(base));
-        let cb_data: Box<Rc<RefCell<ReadAndSeek>>> = Box::new(base.clone());
+        let cb_data: Box<Rc<RefCell<dyn ReadAndSeek>>> = Box::new(base.clone());
         let job = unsafe { raw::rs_patch_begin(patch_copy_cb, mem::transmute(&*cb_data)) };
         assert!(!job.is_null());
         Ok(Patch {
@@ -373,25 +373,17 @@ where
 {
 }
 
-impl error::Error for Error {
-    fn description(&self) -> &str {
-        match *self {
-            Error::Io(ref err) => err.description(),
-            Error::Mem => "out of memory",
-            Error::BadMagic => "bad magic number given",
-            Error::Unimplemented => "unimplemented feature",
-            Error::Internal => "internal error",
-            Error::Unknown(_) => "unknown error from librsync",
-        }
-    }
-}
+impl error::Error for Error {}
 
 impl Display for Error {
     fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
         match *self {
             Error::Io(ref e) => write!(fmt, "{}", e),
+            Error::Mem => write!(fmt, "out of memory"),
+            Error::BadMagic => write!(fmt, "bad magic number given"),
+            Error::Unimplemented => write!(fmt, "unimplemented feature"),
+            Error::Internal => write!(fmt, "internal error"),
             Error::Unknown(n) => write!(fmt, "unknown error {} from native library", n),
-            _ => write!(fmt, "{}", std::error::Error::description(self)),
         }
     }
 }
@@ -455,8 +447,8 @@ extern "C" fn patch_copy_cb(
     len: *mut libc::size_t,
     buf: *mut *mut libc::c_void,
 ) -> raw::rs_result {
-    let mut input: RefMut<ReadAndSeek> = unsafe {
-        let h: *mut Rc<RefCell<ReadAndSeek>> = mem::transmute(opaque);
+    let mut input: RefMut<dyn ReadAndSeek> = unsafe {
+        let h: *mut Rc<RefCell<dyn ReadAndSeek>> = mem::transmute(opaque);
         (*h).borrow_mut()
     };
     let output = unsafe {
@@ -470,7 +462,7 @@ extern "C" fn patch_copy_cb(
 
 fn io_err<E>(kind: io::ErrorKind, e: E) -> Error
 where
-    E: Into<Box<error::Error + Send + Sync>>,
+    E: Into<Box<dyn error::Error + Send + Sync>>,
 {
     Error::Io(io::Error::new(kind, e))
 }

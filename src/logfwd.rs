@@ -1,13 +1,13 @@
 use libc::c_char;
-use std::sync::{Once, ONCE_INIT};
+use std::sync::Once;
 
-use raw;
+use crate::raw;
 
 /// Manually initialize logging.
 ///
 /// It is optional to call this function, and safe to do so more than once.
 pub fn init() {
-    static mut INIT: Once = ONCE_INIT;
+    static mut INIT: Once = Once::new();
 
     unsafe {
         INIT.call_once(|| {
@@ -18,7 +18,7 @@ pub fn init() {
 
 #[cfg(feature = "log")]
 fn init_impl() {
-    use log::{self, LogLevelFilter};
+    use log::LogLevelFilter;
 
     // trace to our callback
     unsafe {
