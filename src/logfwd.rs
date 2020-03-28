@@ -18,7 +18,7 @@ pub fn init() {
 
 #[cfg(feature = "log")]
 fn init_impl() {
-    use log::LogLevelFilter;
+    use log::LevelFilter;
 
     // trace to our callback
     unsafe {
@@ -28,9 +28,9 @@ fn init_impl() {
     // determine log level
     // this is useful because if the setted level is not Debug we can optimize librsync log
     // calls
-    let level = match log::max_log_level() {
-        LogLevelFilter::Info => raw::RS_LOG_NOTICE,
-        LogLevelFilter::Debug | LogLevelFilter::Trace => raw::RS_LOG_DEBUG,
+    let level = match log::max_level() {
+        LevelFilter::Info => raw::RS_LOG_NOTICE,
+        LevelFilter::Debug | LevelFilter::Trace => raw::RS_LOG_DEBUG,
         _ => raw::RS_LOG_WARNING,
     };
     unsafe {
@@ -40,17 +40,15 @@ fn init_impl() {
 
 #[cfg(feature = "log")]
 extern "C" fn trace(level: raw::rs_loglevel, msg: *const c_char) {
-    use log::LogLevel;
+    use log::Level;
     use std::ffi::CStr;
 
     let level = match level {
-        raw::RS_LOG_EMERG | raw::RS_LOG_ALERT | raw::RS_LOG_CRIT | raw::RS_LOG_ERR => {
-            LogLevel::Error
-        }
-        raw::RS_LOG_WARNING => LogLevel::Warn,
-        raw::RS_LOG_NOTICE | raw::RS_LOG_INFO => LogLevel::Info,
-        raw::RS_LOG_DEBUG => LogLevel::Debug,
-        _ => LogLevel::Error,
+        raw::RS_LOG_EMERG | raw::RS_LOG_ALERT | raw::RS_LOG_CRIT | raw::RS_LOG_ERR => Level::Error,
+        raw::RS_LOG_WARNING => Level::Warn,
+        raw::RS_LOG_NOTICE | raw::RS_LOG_INFO => Level::Info,
+        raw::RS_LOG_DEBUG => Level::Debug,
+        _ => Level::Error,
     };
     let msg = unsafe { CStr::from_ptr(msg).to_string_lossy() };
     log!(target: "librsync", level, "{}", msg);
