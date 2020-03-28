@@ -24,4 +24,4 @@ unstable = ["lints", "nightly"] # for building with travis-cargo
 libc = "0.2"
 librsync-sys = { version = "0.1", path = "librsync-sys" }
 clippy = { version = "< 1", optional = true }
-log = { version = "0.3", optional = true }
+log = { version = "0.4", optional = true }
