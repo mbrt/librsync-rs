@@ -1,6 +1,7 @@
 # librsync-rs
 [![Build Status](https://travis-ci.org/mbrt/librsync-rs.svg?branch=master)](https://travis-ci.org/mbrt/librsync-rs)
 [![Coverage Status](https://coveralls.io/repos/github/mbrt/librsync-rs/badge.svg?branch=master)](https://coveralls.io/github/mbrt/librsync-rs?branch=master)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fmbrt%2Flibrsync-rs.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fmbrt%2Flibrsync-rs?ref=badge_shield)
 [![](http://meritbadge.herokuapp.com/librsync)](https://crates.io/crates/librsync)
 
 Rust bindings to [librsync](https://github.com/librsync/librsync).
@@ -135,6 +136,9 @@ at your option.
 This library uses [librsync](https://github.com/librsync/librsync), which comes with an
 [LGPL-2.0](https://github.com/librsync/librsync/blob/master/COPYING) license. Please, be sure to fulfill librsync
 licensing requirements before to use this library.
+
+
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fmbrt%2Flibrsync-rs.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fmbrt%2Flibrsync-rs?ref=badge_large)
 
 ### Contribution
 
