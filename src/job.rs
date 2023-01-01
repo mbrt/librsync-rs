@@ -138,23 +138,25 @@ impl Drop for Job {
 }
 
 impl<'a> Buffers<'a> {
+    #[allow(trivial_casts)]
     pub fn new(in_buf: &'a [u8], out_buf: &'a mut [u8], eof_in: bool) -> Self {
         Buffers {
             inner: raw::rs_buffers_t {
-                next_in: in_buf.as_ptr() as *const i8,
+                next_in: in_buf.as_ptr() as *const libc::c_char,
                 avail_in: in_buf.len(),
                 eof_in: if eof_in { 1 } else { 0 },
-                next_out: out_buf.as_mut_ptr() as *mut i8,
+                next_out: out_buf.as_ptr() as *mut libc::c_char,
                 avail_out: out_buf.len(),
             },
             _phantom: PhantomData,
         }
     }
 
+    #[allow(trivial_casts)]
     pub fn with_no_out(in_buf: &'a [u8], eof_in: bool) -> Self {
         Buffers {
             inner: raw::rs_buffers_t {
-                next_in: in_buf.as_ptr() as *const i8,
+                next_in: in_buf.as_ptr() as *const libc::c_char,
                 avail_in: in_buf.len(),
                 eof_in: if eof_in { 1 } else { 0 },
                 next_out: ptr::null_mut(),
