@@ -24,6 +24,7 @@ fn main() {
         .include("librsync/src")
         .include("librsync/src/blake2")
         .define("STDC_HEADERS", Some("1"))
+        .define("LIBRSYNC_STATIC_DEFINE", Some("1"))
         .file("librsync/src/base64.c")
         .file("librsync/src/buf.c")
         .file("librsync/src/checksum.c")
