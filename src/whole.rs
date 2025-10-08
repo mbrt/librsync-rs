@@ -21,7 +21,7 @@ use std::io::{self, BufRead, Read, Seek, Write};
 /// * `block_len`: the block size for signature generation, in bytes;
 /// * `strong_len`: the truncated length of strong checksums, in bytes;
 /// * `sig_type`: the signature format to be used.
-pub fn signature_with_options<R: ?Sized, W: ?Sized>(
+pub fn signature_with_options<R, W>(
     input: &mut R,
     output: &mut W,
     block_len: usize,
@@ -29,8 +29,8 @@ pub fn signature_with_options<R: ?Sized, W: ?Sized>(
     sig_type: SignatureType,
 ) -> Result<u64>
 where
-    R: BufRead,
-    W: Write,
+    R: BufRead + ?Sized,
+    W: Write + ?Sized,
 {
     let mut sig = Signature::with_options(input, block_len, strong_len, sig_type)?;
     let written = io::copy(&mut sig, output)?;
@@ -43,10 +43,10 @@ where
 /// to the given output. In case of success, the number of bytes written is returned, otherwise
 /// an error is reported. Default settings are used to produce the signature. BLAKE2 for the
 /// hashing, 2048 bytes for the block length and full length for the strong signature size.
-pub fn signature<R: ?Sized, W: ?Sized>(input: &mut R, output: &mut W) -> Result<u64>
+pub fn signature<R, W>(input: &mut R, output: &mut W) -> Result<u64>
 where
-    R: Read,
-    W: Write,
+    R: Read + ?Sized,
+    W: Write + ?Sized,
 {
     let mut sig = Signature::new(input)?;
     let written = io::copy(&mut sig, output)?;
@@ -62,15 +62,11 @@ where
 /// parameter.
 ///
 /// To generate a signature, see the `signature` function, or the `Signature` struct.
-pub fn delta<R: ?Sized, S: ?Sized, W: ?Sized>(
-    new: &mut R,
-    base_sig: &mut S,
-    output: &mut W,
-) -> Result<u64>
+pub fn delta<R, S, W>(new: &mut R, base_sig: &mut S, output: &mut W) -> Result<u64>
 where
-    R: Read,
-    S: Read,
-    W: Write,
+    R: Read + ?Sized,
+    S: Read + ?Sized,
+    W: Write + ?Sized,
 {
     let mut delta = Delta::new(new, base_sig)?;
     let written = io::copy(&mut delta, output)?;
@@ -87,15 +83,11 @@ where
 /// be used to write the output.
 ///
 /// To generate a delta, see the `delta` function, or the `Delta` struct.
-pub fn patch<B: ?Sized, D: ?Sized, W: ?Sized>(
-    base: &mut B,
-    delta: &mut D,
-    output: &mut W,
-) -> Result<u64>
+pub fn patch<B, D, W>(base: &mut B, delta: &mut D, output: &mut W) -> Result<u64>
 where
-    B: Read + Seek,
-    D: Read,
-    W: Write,
+    B: Read + Seek + ?Sized,
+    D: Read + ?Sized,
+    W: Write + ?Sized,
 {
     let mut patch = Patch::new(base, delta)?;
     let written = io::copy(&mut patch, output)?;
@@ -110,8 +102,8 @@ mod test {
     use std::io::Cursor;
     use std::str::from_utf8;
 
-    const DATA: &'static str = "this is a string to be tested";
-    const DATA2: &'static str = "this is another string to be tested";
+    const DATA: &str = "this is a string to be tested";
+    const DATA2: &str = "this is another string to be tested";
 
     #[test]
     fn integration() {
