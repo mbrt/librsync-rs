@@ -98,8 +98,6 @@
     unused_qualifications
 )]
 #![cfg_attr(feature = "nightly", allow(unstable_features))]
-#![cfg_attr(feature = "lints", feature(plugin))]
-#![cfg_attr(feature = "lints", plugin(clippy))]
 
 extern crate libc;
 extern crate librsync_sys as raw;
@@ -498,8 +496,8 @@ mod test {
     use std::io::{Cursor, Read};
     use std::thread;
 
-    const DATA: &'static str = "this is a string to be tested";
-    const DATA2: &'static str = "this is another string to be tested";
+    const DATA: &str = "this is a string to be tested";
+    const DATA2: &str = "this is another string to be tested";
 
     // generated with `rdiff signature -b 10 -S 5 data data.sig`
     fn data_signature() -> Vec<u8> {

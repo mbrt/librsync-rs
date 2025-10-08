@@ -70,7 +70,7 @@ impl<R: BufRead> JobDriver<R> {
                 }
                 _ => {
                     let err = Error::from(res);
-                    return Err(io::Error::new(io::ErrorKind::Other, err));
+                    return Err(io::Error::other(err));
                 }
             };
 
@@ -99,7 +99,7 @@ impl<R: BufRead> Read for JobDriver<R> {
                 let res = unsafe { raw::rs_job_iter(*self.job, buffers.as_raw()) };
                 if res != raw::RS_DONE && res != raw::RS_BLOCKED {
                     let err = Error::from(res);
-                    return Err(io::Error::new(io::ErrorKind::Other, err));
+                    return Err(io::Error::other(err));
                 }
                 let read = cap - buffers.available_input();
                 let written = out_cap - buffers.available_output();
