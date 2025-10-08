@@ -1,5 +1,5 @@
 use libc::c_char;
-use std::sync::Once;
+use std::sync::OnceLock;
 
 use crate::raw;
 
@@ -7,13 +7,11 @@ use crate::raw;
 ///
 /// It is optional to call this function, and safe to do so more than once.
 pub fn init() {
-    static mut INIT: Once = Once::new();
+    static INIT: OnceLock<()> = OnceLock::new();
 
-    unsafe {
-        INIT.call_once(|| {
-            init_impl();
-        });
-    }
+    INIT.get_or_init(|| {
+        init_impl();
+    });
 }
 
 #[cfg(feature = "log")]
