@@ -118,7 +118,7 @@ use std::cell::{RefCell, RefMut};
 use std::error;
 use std::fmt::{self, Display, Formatter};
 use std::io::{self, BufRead, BufReader, Read, Seek};
-use std::mem;
+use std::mem::{self, ManuallyDrop};
 use std::ops::Deref;
 use std::ptr;
 use std::rc::Rc;
@@ -182,7 +182,7 @@ pub struct Delta<R> {
 pub struct Patch<'a, B: 'a, D> {
     driver: JobDriver<D>,
     base: Rc<RefCell<B>>,
-    raw: Box<Rc<RefCell<dyn ReadAndSeek + 'a>>>,
+    raw: *mut Rc<RefCell<dyn ReadAndSeek + 'a>>,
 }
 
 struct Sumset(*mut raw::rs_signature_t);
@@ -337,32 +337,57 @@ impl<'a, B: Read + Seek + 'a, D: BufRead> Patch<'a, B, D> {
 
         let base = Rc::new(RefCell::new(base));
         let cb_data: Box<Rc<RefCell<dyn ReadAndSeek>>> = Box::new(base.clone());
-        let job = unsafe { raw::rs_patch_begin(patch_copy_cb, mem::transmute(&*cb_data)) };
+        let raw_ptr = Box::into_raw(cb_data);
+        let job = unsafe { raw::rs_patch_begin(patch_copy_cb, raw_ptr as *mut libc::c_void) };
         assert!(!job.is_null());
         Ok(Patch {
             driver: JobDriver::new(delta, Job(job)),
             base,
-            raw: cb_data,
+            raw: raw_ptr,
         })
     }
 
     /// Unwraps this stream and returns the underlying streams.
     pub fn into_inner(self) -> (B, D) {
-        // drop the secondary Rc before unwrapping the other
-        {
-            let _drop = self.raw;
+        let mut this = ManuallyDrop::new(self);
+
+        // Manually clean up the raw pointer to prevent double-free
+        // This will drop the Rc inside the Box, reducing the reference count
+        unsafe {
+            if !this.raw.is_null() {
+                let _ = Box::from_raw(this.raw);
+                this.raw = ptr::null_mut();
+            }
         }
-        let base = match Rc::try_unwrap(self.base) {
+
+        // Now we can unwrap the base Rc since we've dropped the other reference
+        // We need to use ptr::read to move out of ManuallyDrop
+        let base_rc = unsafe { ptr::read(&this.base) };
+        let base = match Rc::try_unwrap(base_rc) {
             Ok(base) => base,
             _ => unreachable!(),
         };
-        (base.into_inner(), self.driver.into_inner())
+
+        // Extract the driver using ptr::read since we can't move out of ManuallyDrop
+        let driver = unsafe { ptr::read(&this.driver) };
+
+        (base.into_inner(), driver.into_inner())
     }
 }
 
 impl<'a, B, D: BufRead> Read for Patch<'a, B, D> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.driver.read(buf)
+    }
+}
+
+impl<'a, B, D> Drop for Patch<'a, B, D> {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.raw.is_null() {
+                let _ = Box::from_raw(self.raw);
+            }
+        }
     }
 }
 

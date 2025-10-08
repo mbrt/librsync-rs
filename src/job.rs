@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::ptr;
 
-use crate::{raw, Error};
+use crate::{Error, raw};
 
 pub struct JobDriver<R> {
     input: R,
