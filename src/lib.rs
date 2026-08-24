@@ -479,7 +479,13 @@ extern "C" fn patch_copy_cb(
         slice::from_raw_parts_mut(buf, *len)
     };
     try_or_rs_error!(input.seek(io::SeekFrom::Start(pos as u64)));
-    try_or_rs_error!(input.read(output));
+    let read_len = try_or_rs_error!(input.read(output));
+    if read_len == 0 {
+        // end of the base file, like librsync's own rs_file_copy_cb
+        return raw::RS_INPUT_ENDED;
+    }
+    // report a short read; librsync will call back for the rest
+    unsafe { *len = read_len };
     raw::RS_DONE
 }
 
@@ -598,6 +604,71 @@ mod test {
             patch.read_to_string(&mut computed_new).unwrap();
         });
         t.join().unwrap();
+    }
+
+    fn patch_result(base: &[u8], delta: Vec<u8>) -> io::Result<Vec<u8>> {
+        let mut patch = Patch::new(Cursor::new(base.to_vec()), Cursor::new(delta))
+            .map_err(|e| io::Error::other(e.to_string()))?;
+        let mut out = Vec::new();
+        patch.read_to_end(&mut out)?;
+        Ok(out)
+    }
+
+    // Run `f` on another thread so a regression hangs the test, not the whole suite.
+    fn with_timeout<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> T {
+        let (tx, rx) = std::sync::mpsc::channel();
+        thread::spawn(move || {
+            let _ = tx.send(f());
+        });
+        rx.recv_timeout(std::time::Duration::from_secs(5))
+            .expect("operation did not complete in time")
+    }
+
+    const DELTA_MAGIC: [u8; 4] = [0x72, 0x73, 0x02, 0x36];
+    const RS_OP_LITERAL_N8: u8 = 0x44;
+    const RS_OP_COPY_N1_N1: u8 = 0x45;
+    const RS_OP_END: u8 = 0x00;
+
+    // Expected results below match what librsync's own rs_patch_file returns for the same
+    // base and delta (RS_INPUT_ENDED for reads past the end of the base and for the
+    // over-long literal; on the blocked delta rs_patch_file never returns).
+
+    #[test]
+    fn patch_copy_past_end_of_base_fails() {
+        // copy 7 bytes from offset 0 of a 6-byte base, then end
+        let mut delta = DELTA_MAGIC.to_vec();
+        delta.extend_from_slice(&[RS_OP_COPY_N1_N1, 0, 7, RS_OP_END]);
+        let err = patch_result(b"potato", delta).unwrap_err();
+        assert!(err.to_string().contains("unexpected end of input"), "{err}");
+
+        // copy 1 byte from offset 10 of a 6-byte base, then end
+        let mut delta = DELTA_MAGIC.to_vec();
+        delta.extend_from_slice(&[RS_OP_COPY_N1_N1, 10, 1, RS_OP_END]);
+        let err = patch_result(b"potato", delta).unwrap_err();
+        assert!(err.to_string().contains("unexpected end of input"), "{err}");
+
+        // sanity check: copying exactly the base works
+        let mut delta = DELTA_MAGIC.to_vec();
+        delta.extend_from_slice(&[RS_OP_COPY_N1_N1, 0, 6, RS_OP_END]);
+        assert_eq!(patch_result(b"potato", delta).unwrap(), b"potato");
+    }
+
+    #[test]
+    fn patch_zero_length_copy_does_not_hang() {
+        let mut delta = DELTA_MAGIC.to_vec();
+        delta.extend_from_slice(&[RS_OP_COPY_N1_N1, 0, 0]);
+        let err = with_timeout(move || patch_result(b"potato", delta)).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn patch_overlong_literal_fails_instead_of_aborting() {
+        // without NDEBUG this trips an assert in tube.c and aborts the process
+        let mut delta = DELTA_MAGIC.to_vec();
+        delta.push(RS_OP_LITERAL_N8);
+        delta.extend_from_slice(&(i64::MAX as u64).to_be_bytes());
+        delta.extend_from_slice(b"hello");
+        assert!(with_timeout(move || patch_result(b"potato", delta)).is_err());
     }
 
     #[test]
