@@ -1,6 +1,6 @@
 [package]
 name = "librsync-sys"
-version = "0.1.3"
+version = "0.1.4"
 build = "build.rs"
 description = """
 Native bindings and vendored sources of librsync, for the librsync crate.

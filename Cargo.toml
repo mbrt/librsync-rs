@@ -21,7 +21,7 @@ cc = "1.0"
 
 [package]
 name = "librsync"
-version = "0.2.5"
+version = "0.2.6"
 readme = "README.md"
 keywords = ["librsync", "rsync", "backup"]
 documentation = "https://docs.rs/librsync"
