@@ -103,6 +103,13 @@ impl<R: BufRead> Read for JobDriver<R> {
                 }
                 let read = cap - buffers.available_input();
                 let written = out_cap - buffers.available_output();
+                if res == raw::RS_BLOCKED && read == 0 && written == 0 {
+                    // nothing was consumed or produced, so iterating again would block forever
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "librsync job blocked without making progress",
+                    ));
+                }
                 (res, read, written)
             };
 
