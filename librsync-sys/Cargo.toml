@@ -1,22 +1,22 @@
 [package]
 name = "librsync-sys"
 version = "0.1.3"
-authors = ["Michele Bertasi <@brt_device>"]
 build = "build.rs"
-license = "MIT/Apache-2.0"
-repository = "https://github.com/mbrt/librsync-rs"
-homepage = "https://github.com/mbrt/librsync-rs"
 description = """
-Bindings to librsync for calculating and applying network
-deltas exposed as Reader/Writer streams.
+Native bindings and vendored sources of librsync, for the librsync crate.
 """
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 
 [lib]
 name = "librsync_sys"
 path = "lib.rs"
 
 [dependencies]
-libc = "0.2"
+libc.workspace = true
 
 [build-dependencies]
-cc = "1.0"
+cc.workspace = true

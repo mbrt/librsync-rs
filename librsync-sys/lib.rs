@@ -57,7 +57,7 @@ pub type rs_copy_cb = extern "C" fn(
 ) -> rs_result;
 pub type rs_trace_fn_t = extern "C" fn(level: rs_loglevel, msg: *const c_char);
 
-extern "C" {
+unsafe extern "C" {
     pub fn rs_job_iter(job: *mut rs_job_t, buffers: *mut rs_buffers_t) -> rs_result;
     pub fn rs_job_free(job: *mut rs_job_t) -> rs_result;
 

@@ -1,18 +1,39 @@
-[package]
-name = "librsync"
-version = "0.2.5"
+[workspace]
+# The vendored librsync submodule ships its own package (gen) that must stay out
+# of the workspace. Cargo ignores `exclude` under an explicitly listed member, so
+# librsync-sys joins the workspace through the path dependency below instead.
+exclude = ["librsync-sys/librsync"]
+
+[workspace.package]
 authors = ["Michele Bertasi"]
 edition = "2024"
 license = "MIT/Apache-2.0"
-readme = "README.md"
-keywords = ["librsync", "rsync", "backup"]
 repository = "https://github.com/mbrt/librsync-rs"
 homepage = "https://github.com/mbrt/librsync-rs"
+
+[workspace.dependencies]
+# Bump this requirement together with the librsync-sys version whenever a
+# release depends on changes made there (see docs/release.md).
+librsync-sys = { version = "0.1", path = "librsync-sys" }
+libc = "0.2"
+log = "0.4"
+cc = "1.0"
+
+[package]
+name = "librsync"
+version = "0.2.5"
+readme = "README.md"
+keywords = ["librsync", "rsync", "backup"]
 documentation = "https://docs.rs/librsync"
 description = """
 Bindings to librsync for calculating and applying network
 deltas exposed as Reader/Writer streams.
 """
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 
 [features]
 default = ["log"] # forward logs to log crate, or disable them
@@ -21,7 +42,7 @@ nightly = [] # for building with nightly and unstable features
 unstable = ["lints", "nightly"] # for building with travis-cargo
 
 [dependencies]
-libc = "0.2"
-librsync-sys = { version = "0.1", path = "librsync-sys" }
+libc.workspace = true
+librsync-sys.workspace = true
 clippy = { version = "< 1", optional = true }
-log = { version = "0.4", optional = true }
+log = { workspace = true, optional = true }
