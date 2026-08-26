@@ -46,9 +46,7 @@ compile for everyone, so make sure it is checked out first:
 
 ```sh
 git submodule update --init --recursive
-cargo fmt --check
-cargo clippy --workspace --all-targets
-cargo test --workspace
+make all  # runs tests and linters
 ```
 
 The C sources must show up in the `librsync-sys` package:

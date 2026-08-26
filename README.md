@@ -123,6 +123,11 @@ fn main() {
 }
 ```
 
+## Development
+
+Run `make lint` for formatting and clippy checks, `make test` for the test suite,
+or plain `make` for both.
+
 ## License
 
 Licensed under either of
