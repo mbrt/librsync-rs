@@ -9,6 +9,10 @@ fn main() {
 
     let mut cfg = cc::Build::new();
 
+    // cc enables -Wall -Wextra by default; the vendored librsync sources are not
+    // ours to fix, so their diagnostics would only be noise in every build.
+    cfg.warnings(false);
+
     if windows {
         cfg.define("_WIN32", None);
     }
